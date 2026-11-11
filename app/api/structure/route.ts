@@ -6,16 +6,35 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * Turns a free-text bug note into structured bug reports with Claude.
+ * Turns a free-text bug note (and screenshots) into structured bug reports with an AI model.
  *
- * - The Anthropic key lives only on the server (ANTHROPIC_API_KEY). It is never sent to the browser.
+ * - Provider keys live only on the server. They are never sent to the browser.
+ *   GEMINI_API_KEY uses Google Gemini (has a free tier). ANTHROPIC_API_KEY uses Claude.
+ *   If both are set, Claude is used unless AI_PROVIDER=gemini.
  * - Only signed-in Bug Sheet team members can call it (their Supabase session is checked on every request).
  * - If no key is set, or the model call fails, the app falls back to its built-in rules.
  */
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
+const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+type Provider = "claude" | "gemini";
+function pickProvider(): Provider | null {
+  const claude = !!process.env.ANTHROPIC_API_KEY;
+  const gemini = !!process.env.GEMINI_API_KEY;
+  if (process.env.AI_PROVIDER === "gemini" && gemini) return "gemini";
+  if (process.env.AI_PROVIDER === "claude" && claude) return "claude";
+  return claude ? "claude" : gemini ? "gemini" : null;
+}
+
+/** A model call that failed in a way the caller should hear about. */
+class ModelFailure extends Error {
+  constructor(public status: number, public code: string) {
+    super(code);
+  }
+}
 
 const hits = new Map<string, number[]>();
 function rateLimited(userId: string) {
@@ -45,10 +64,78 @@ async function authenticate(req: Request): Promise<string | null> {
   }
 }
 
+/* ------------------------------------------------------------------ Claude */
+async function callClaude(system: string, text: string, images: StructureImage[]): Promise<string> {
+  const client = new Anthropic({ maxRetries: 1, timeout: 45_000 });
+  const params = {
+    model: CLAUDE_MODEL,
+    max_tokens: 4096,
+    system,
+    messages: [{ role: "user" as const, content: buildUserContent(text, images) }],
+    // A short think keeps replies quick while still writing a careful report.
+    output_config: { effort: "medium" as const, format: { type: "json_schema" as const, schema: OUTPUT_SCHEMA as unknown as Record<string, unknown> } },
+  };
+  let message: Anthropic.Message | Anthropic.Beta.BetaMessage;
+  try {
+    // If the model declines on policy grounds, let the API retry on its fallback model.
+    message = await client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+  } catch (e) {
+    if (!(e instanceof Anthropic.BadRequestError)) throw e;
+    message = await client.messages.create(params as Anthropic.MessageCreateParamsNonStreaming);
+  }
+  if (message.stop_reason === "refusal") throw new ModelFailure(422, "refused");
+  if (message.stop_reason === "max_tokens") throw new ModelFailure(502, "too_long_output");
+  const block = message.content.find((b) => b.type === "text");
+  return block && "text" in block ? block.text : "";
+}
+
+/* ------------------------------------------------------------------ Gemini */
+interface GeminiStep {
+  type?: string;
+  content?: { type?: string; text?: string }[];
+}
+
+async function callGemini(system: string, text: string, images: StructureImage[]): Promise<string> {
+  const input: Record<string, unknown>[] = [];
+  images.forEach((img, i) => {
+    input.push({ type: "text", text: `Screenshot ${i + 1}:` });
+    input.push({ type: "image", data: img.data, mime_type: img.mediaType });
+  });
+  input.push({ type: "text", text: `<note>\n${text.trim()}\n</note>` });
+
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      system_instruction: system,
+      input,
+      response_format: { type: "text", mime_type: "application/json", schema: OUTPUT_SCHEMA },
+      generation_config: { max_output_tokens: 8192 },
+    }),
+    signal: AbortSignal.timeout(50_000),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    // The body can name the reason (bad key, quota). Log it for the server owner; never return it to the browser.
+    console.error("structure: gemini error", res.status, (await res.text().catch(() => "")).slice(0, 300));
+    throw new ModelFailure(res.status === 429 ? 429 : 502, res.status === 429 ? "rate_limited" : "model_error");
+  }
+  const data = (await res.json()) as { steps?: GeminiStep[]; output_text?: string };
+  const fromSteps = (data.steps ?? [])
+    .filter((s) => !s.type || s.type === "model_output")
+    .flatMap((s) => s.content ?? [])
+    .filter((c) => c.type === "text" && typeof c.text === "string")
+    .map((c) => c.text)
+    .join("");
+  return fromSteps || data.output_text || "";
+}
+
 export async function POST(req: Request) {
   const userId = await authenticate(req);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  const provider = pickProvider();
+  if (!provider) return NextResponse.json({ error: "not_configured" }, { status: 503 });
   if (rateLimited(userId)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
 
   let body: StructureRequest;
@@ -67,34 +154,16 @@ export async function POST(req: Request) {
     .filter((i) => i && kinds.includes(i.mediaType) && typeof i.data === "string" && /^[A-Za-z0-9+/=]+$/.test(i.data) && i.data.length <= MAX_IMAGE_B64)
     .slice(0, MAX_IMAGES);
 
-  const client = new Anthropic({ maxRetries: 1, timeout: 45_000 });
-  const params = {
-    model: MODEL,
-    max_tokens: 4096,
-    system: buildSystemPrompt({ text, modules, severityDefinitions: body.severityDefinitions, images }),
-    messages: [{ role: "user" as const, content: buildUserContent(text, images) }],
-    // A short think keeps replies quick while still writing a careful report.
-    output_config: { effort: "medium" as const, format: { type: "json_schema" as const, schema: OUTPUT_SCHEMA as unknown as Record<string, unknown> } },
-  };
-
+  const system = buildSystemPrompt({ text, modules, severityDefinitions: body.severityDefinitions, images });
   try {
-    let message: Anthropic.Message | Anthropic.Beta.BetaMessage;
-    try {
-      // If the model declines on policy grounds, let the API retry on its fallback model.
-      message = await client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } as Anthropic.Beta.MessageCreateParamsNonStreaming);
-    } catch (e) {
-      if (!(e instanceof Anthropic.BadRequestError)) throw e;
-      message = await client.messages.create(params as Anthropic.MessageCreateParamsNonStreaming);
-    }
-    if (message.stop_reason === "refusal") return NextResponse.json({ error: "refused" }, { status: 422 });
-    if (message.stop_reason === "max_tokens") return NextResponse.json({ error: "too_long_output" }, { status: 502 });
-    const textBlock = message.content.find((b) => b.type === "text");
-    const bugs = parseModelOutput(textBlock && "text" in textBlock ? textBlock.text : "", modules.map((m) => m.name));
+    const raw = provider === "gemini" ? await callGemini(system, text, images) : await callClaude(system, text, images);
+    const bugs = parseModelOutput(raw, modules.map((m) => m.name));
     if (!bugs.length) return NextResponse.json({ error: "unreadable" }, { status: 502 });
-    return NextResponse.json({ source: "ai", model: message.model, bugs });
+    return NextResponse.json({ source: "ai", provider, bugs });
   } catch (e) {
+    if (e instanceof ModelFailure) return NextResponse.json({ error: e.code }, { status: e.status });
     const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    console.error("structure: model call failed", status ?? (e as Error).message);
+    console.error("structure: model call failed", provider, status ?? (e as Error).message);
     return NextResponse.json({ error: "model_error" }, { status: 502 });
   }
 }

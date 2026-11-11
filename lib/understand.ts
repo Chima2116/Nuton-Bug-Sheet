@@ -9,8 +9,9 @@ export type { UnderstoodBug };
 
 export interface Understanding {
   bugs: UnderstoodBug[];
-  /** "ai" when Claude read the note; "basic" when the built-in rules did. */
+  /** "ai" when an AI model read the note; "basic" when the built-in rules did. */
   source: "ai" | "basic";
+  provider?: "claude" | "gemini";
 }
 
 /** The built-in, rule-based reading. It only restructures what was written and leaves gaps empty. */
@@ -34,7 +35,7 @@ export function understandBasic(text: string, modules: AppModule[]): UnderstoodB
   }));
 }
 
-/** Reads a free-text note. Tries Claude through the server route and quietly falls back to the built-in rules. */
+/** Reads a free-text note. Tries the AI model through the server route and quietly falls back to the built-in rules. */
 export async function understand(text: string, ctx: { modules: AppModule[]; definitions: Definitions; images?: StructureImage[]; signal?: AbortSignal }): Promise<Understanding> {
   const basic = (): Understanding => ({ bugs: understandBasic(text, ctx.modules), source: "basic" });
   try {
@@ -52,9 +53,9 @@ export async function understand(text: string, ctx: { modules: AppModule[]; defi
       signal: ctx.signal,
     });
     if (!res.ok) return basic();
-    const data = (await res.json()) as { bugs?: UnderstoodBug[] };
+    const data = (await res.json()) as { bugs?: UnderstoodBug[]; provider?: "claude" | "gemini" };
     if (!Array.isArray(data.bugs) || !data.bugs.length) return basic();
-    return { bugs: data.bugs, source: "ai" };
+    return { bugs: data.bugs, source: "ai", provider: data.provider };
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
     return basic();

@@ -356,8 +356,8 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
                   </span>
                   <p className="text-[13px] font-medium text-ink">{analysing && !cur ? "Reading your note…" : "How this will be filed"}</p>
                   {result ? (
-                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", result.source === "ai" ? "bg-olive-100 text-olive-800" : "bg-wash-2 text-muted")} title={result.source === "ai" ? "Structured by Claude" : "Structured with built-in rules. Claude isn't connected yet."}>
-                      {result.source === "ai" ? "Claude" : "Basic"}
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", result.source === "ai" ? "bg-olive-100 text-olive-800" : "bg-wash-2 text-muted")} title={result.source === "ai" ? `Structured by ${result.provider === "gemini" ? "Gemini" : "Claude"}` : "Structured with built-in rules. No AI key is connected yet."}>
+                      {result.source === "ai" ? (result.provider === "gemini" ? "Gemini" : "Claude") : "Basic"}
                     </span>
                   ) : null}
                   {analysing && cur ? <span className="text-xs text-muted">Updating…</span> : null}
@@ -409,7 +409,7 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
                       </div>
                     ) : null}
                     {cur.environment ? <p className="text-xs text-muted">Environment: <span className="text-ink-2">{cur.environment}</span></p> : null}
-                    {result?.source === "basic" ? <p className="text-xs text-muted">Using basic structuring. Claude isn&apos;t connected yet, so wording is kept close to what you wrote.</p> : null}
+                    {result?.source === "basic" ? <p className="text-xs text-muted">Using basic structuring. No AI key is connected yet, so wording is kept close to what you wrote.</p> : null}
                   </div>
                 ) : null}
               </section>
