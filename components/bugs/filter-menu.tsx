@@ -18,12 +18,12 @@ function TriggerButton({ label, count, children }: { label: string; count?: numb
   return (
     <button
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-md border px-2.5 text-[13px] transition-colors",
-        active ? "border-olive-300 bg-olive-50 text-olive-800" : "border-line-strong bg-white text-ink-2 hover:bg-wash",
+        "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors",
+        active ? "bg-olive-50 text-olive-800 shadow-[inset_0_0_0_1px_var(--color-olive-200)]" : "bg-white text-ink-2 shadow-[var(--shadow-card)] hover:bg-wash",
       )}
     >
       {label}
-      {active ? <span className="tnum rounded bg-olive-600 px-1.5 text-[11px] font-medium leading-[18px] text-white">{count}</span> : null}
+      {active ? <span className="tnum rounded-full bg-olive-600 px-1.5 text-[11px] font-medium leading-[18px] text-white">{count}</span> : null}
       {children}
       <ChevronDown className="size-3.5 text-faint" />
     </button>
@@ -56,8 +56,8 @@ export function FilterMenu({
           {options.map((o) => {
             const on = selected.includes(o.value);
             return (
-              <button key={o.value} onClick={() => toggle(o.value)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-wash">
-                <span className={cn("flex size-4 shrink-0 items-center justify-center rounded-[4px] border", on ? "border-olive-600 bg-olive-600 text-white" : "border-line-strong")}>{on ? <Check className="size-3" strokeWidth={3} /> : null}</span>
+              <button key={o.value} onClick={() => toggle(o.value)} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink hover:bg-wash">
+                <span className={cn("flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border", on ? "border-olive-600 bg-olive-600 text-white" : "border-line-strong")}>{on ? <Check className="size-3" strokeWidth={3} /> : null}</span>
                 {o.dot ? <span className={cn("size-1.5 shrink-0 rounded-full", o.dot)} /> : null}
                 <span className="min-w-0 flex-1 truncate">{o.label}</span>
               </button>
@@ -104,7 +104,7 @@ export function DateFilter({ value, from, to, onChange }: { value: DateRange; fr
               onChange({ date: o.id, from: o.id === "custom" ? from : "", to: o.id === "custom" ? to : "" });
               if (o.id !== "custom") setOpen(false);
             }}
-            className="flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-[13px] text-ink hover:bg-wash"
+            className="flex w-full items-center rounded-lg px-2.5 py-2 text-left text-[13px] text-ink hover:bg-wash"
           >
             <span className="flex-1">{o.label}</span>
             {value === o.id ? <Check className="size-3.5 text-olive-600" /> : null}

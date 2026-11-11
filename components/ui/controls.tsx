@@ -16,7 +16,7 @@ export function Checkbox({ checked, indeterminate, onChange, label, className, s
         onChange(!checked);
       }}
       className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+        "flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
         on ? "border-olive-600 bg-olive-600 text-white" : "border-line-strong bg-white hover:border-faint",
         className,
       )}
@@ -38,7 +38,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="tablist" className={cn("inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-wash p-0.5", className)}>
+    <div role="tablist" className={cn("inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-wash-2/70 p-1", className)}>
       {options.map((o) => (
         <button
           key={o.id}
@@ -46,8 +46,8 @@ export function Segmented<T extends string>({
           aria-selected={value === o.id}
           onClick={() => onChange(o.id)}
           className={cn(
-            "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors",
-            value === o.id ? "bg-white text-ink shadow-[0_0_0_1px_var(--color-line)]" : "text-muted hover:text-ink",
+            "inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium transition-all",
+            value === o.id ? "bg-white text-ink shadow-[var(--shadow-card)]" : "text-muted hover:text-ink",
           )}
         >
           {o.label}
@@ -62,13 +62,15 @@ export function UnderlineTabs<T extends string>({
   value,
   onChange,
   options,
+  className,
 }: {
   value: T;
   onChange: (v: T) => void;
-  options: { id: T; label: string; icon?: ReactNode }[];
+  options: { id: T; label: string; icon?: ReactNode; count?: number }[];
+  className?: string;
 }) {
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-line">
+    <div role="tablist" className={cn("flex gap-1 overflow-x-auto border-b border-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
       {options.map((o) => (
         <button
           key={o.id}
@@ -82,6 +84,7 @@ export function UnderlineTabs<T extends string>({
         >
           {o.icon}
           {o.label}
+          {o.count ? <span className="tnum rounded-full bg-wash-2 px-1.5 text-[11px] text-muted">{o.count}</span> : null}
         </button>
       ))}
     </div>

@@ -113,9 +113,11 @@ function readLabelled(text: string) {
 function sentences(text: string): string[] {
   return text
     .replace(/\n+/g, " ")
-    .split(/(?<=[.!?])\s+(?=[A-Z"“'(])/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+    // Split at sentence ends, whether or not the next sentence starts with a capital (quick notes often don't).
+    .split(/(?<!\b(?:e\.g|i\.e|vs|etc|approx))(?<=[.!?])\s+(?=[A-Za-z"“'(])/i)
+    .map((s) => s.trim().replace(/(^|[\s(])i(?=[\s,.'’!?]|$)/g, "$1I"))
+    .filter(Boolean)
+    .map(cap);
 }
 
 const EXPECT_RE = /\b(should|expected|expect|ought to|supposed to|must|needs? to|would like|ideally|i'd like)\b/i;

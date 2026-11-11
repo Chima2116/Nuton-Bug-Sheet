@@ -42,7 +42,7 @@ export default function LoginPage() {
       <AuthShell title="Reset password" subtitle="Enter your email and we'll send you a link to choose a new password.">
         {sent ? (
           <div className="space-y-4">
-            <p className="rounded-lg bg-wash px-4 py-3 text-[13.5px] text-ink-2">If <b>{email}</b> is on the team, a reset link is on its way. It can take a minute.</p>
+            <p className="rounded-xl bg-wash px-4 py-3 text-[13.5px] text-ink-2">If <b>{email}</b> is on the team, a reset link is on its way. It can take a minute.</p>
             <button onClick={() => { setMode("signin"); setSent(false); }} className="text-[13px] font-medium text-olive-700 hover:underline">Back to sign in</button>
           </div>
         ) : (

@@ -37,14 +37,14 @@ export function ModulesTab() {
       </div>
 
       {manage ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-wash p-3">
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl bg-wash p-3.5">
           <Input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void add()} placeholder="Module name" className="w-full bg-white sm:w-[220px]" aria-label="Module name" />
           <Input value={desc} onChange={(e) => setDesc(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void add()} placeholder="Short description (optional)" className="min-w-0 flex-1 bg-white sm:basis-[260px]" aria-label="Module description" />
           <Button variant="primary" size="lg" onClick={() => void add()} disabled={!name.trim()}><Plus className="size-4" /> Add module</Button>
         </div>
       ) : null}
 
-      <ul className="divide-y divide-line rounded-lg border border-line">
+      <ul className="divide-y divide-line/70 rounded-2xl border border-line">
         {modules.map((m) => {
           const count = bugs.filter((b) => b.moduleId === m.id).length;
           const isEditing = editing === m.id;

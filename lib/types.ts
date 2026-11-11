@@ -173,9 +173,12 @@ export interface QuickForm {
 
 export interface Draft {
   id: string;
-  /** "form" for the evidence-first form; absent for drafts from the notes flow. */
-  kind?: "form";
+  /** "note" for a free-text report; "form" for the older evidence-first form; absent for the oldest drafts. */
+  kind?: "form" | "note";
   form?: QuickForm;
+  /** Free-text report in progress (kind "note"). */
+  note?: string;
+  assigneeId?: string;
   original: string;
   attachments: Attachment[];
   moduleHint: string;

@@ -1,21 +1,20 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
-@import "@fontsource-variable/newsreader";
 
 @theme {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif: "Newsreader Variable", "Iowan Old Style", Georgia, serif;
 
   /* Neutrals: warm-leaning, restrained */
   --color-ink: #1b1b19;
   --color-ink-2: #3a3a36;
   --color-muted: #6b6b64;
   --color-faint: #9b9b93;
-  --color-line: #e8e8e4;
-  --color-line-strong: #d9d9d3;
+  --color-line: #ebebe6;
+  --color-line-strong: #dcdcd5;
   --color-surface: #ffffff;
   --color-wash: #f7f7f5;
-  --color-wash-2: #f0f0ed;
+  --color-wash-2: #efefeb;
+  --color-canvas: #f4f4f0;
 
   /* Olive accent */
   --color-olive-50: #f5f6ea;
@@ -44,12 +43,16 @@
   --text-sm: 13px;
   --text-base: 14px;
 
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 
-  --shadow-pop: 0 8px 24px -6px rgba(27, 27, 25, 0.14), 0 0 0 1px rgba(27, 27, 25, 0.06);
-  --shadow-sheet: -12px 0 40px -12px rgba(27, 27, 25, 0.14);
+  --shadow-card: 0 1px 2px rgba(27, 27, 25, 0.04), 0 0 0 1px rgba(27, 27, 25, 0.05);
+  --shadow-pop: 0 12px 32px -8px rgba(27, 27, 25, 0.18), 0 2px 6px rgba(27, 27, 25, 0.05), 0 0 0 1px rgba(27, 27, 25, 0.06);
+  --shadow-sheet: 0 24px 60px -12px rgba(27, 27, 25, 0.28), 0 0 0 1px rgba(27, 27, 25, 0.06);
+  --shadow-modal: 0 32px 80px -16px rgba(27, 27, 25, 0.35), 0 0 0 1px rgba(27, 27, 25, 0.06);
 
   --animate-fade-in: fade-in 140ms ease-out;
   --animate-pop-in: pop-in 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -71,7 +74,7 @@
 html, body { height: 100%; }
 
 body {
-  background: var(--color-surface);
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -91,7 +94,7 @@ button:disabled { cursor: not-allowed; }
   input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 }
 
-.font-display { font-family: var(--font-serif); font-optical-sizing: auto; letter-spacing: -0.015em; font-weight: 400; }
+.font-display { font-family: var(--font-sans); letter-spacing: -0.022em; font-weight: 600; }
 .tnum { font-variant-numeric: tabular-nums; }
 
 /* Thin scrollbars */

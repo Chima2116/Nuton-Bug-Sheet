@@ -1,12 +1,6 @@
-import { Suspense } from "react";
-import { QuickReport } from "@/components/report/quick-report";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Report a Bug" };
-
+// Reporting is a modal that opens from anywhere. This keeps old /report links working.
 export default function ReportPage() {
-  return (
-    <Suspense fallback={null}>
-      <QuickReport />
-    </Suspense>
-  );
+  redirect("/bugs?report=1");
 }

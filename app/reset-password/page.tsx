@@ -42,7 +42,7 @@ export default function ResetPasswordPage() {
       <AuthShell title="Choose a new password">
         {expired ? (
           <div className="space-y-4">
-            <p className="rounded-lg bg-wash px-4 py-3 text-[13.5px] text-ink-2">This reset link is invalid or has expired.</p>
+            <p className="rounded-xl bg-wash px-4 py-3 text-[13.5px] text-ink-2">This reset link is invalid or has expired.</p>
             <Link href="/login" className="text-[13px] font-medium text-olive-700 hover:underline">Request a new link</Link>
           </div>
         ) : (

@@ -10,12 +10,12 @@ export function CompactList({ bugs, showStatus = true, showAssignee }: { bugs: B
   const modules = useModuleMap();
   const users = useUserMap();
   return (
-    <ul className="divide-y divide-line">
+    <ul className="divide-y divide-line/70">
       {bugs.map((b) => {
         const u = b.assigneeId ? users.get(b.assigneeId) : null;
         return (
           <li key={b.id}>
-            <Link href={`/bugs/${b.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-wash">
+            <Link href={`/bugs/${b.id}`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-wash/70">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13.5px] font-medium text-ink" title={b.title}>{b.title}</p>
                 <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted">

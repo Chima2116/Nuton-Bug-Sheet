@@ -15,7 +15,7 @@ export function TeamTab() {
           <h2 className="text-sm font-semibold text-ink">Team</h2>
           <p className="mt-0.5 text-[13px] text-muted">The two people in this workspace. Accounts are managed in Supabase, so there is no public sign-up.</p>
         </div>
-        <ul className="divide-y divide-line rounded-lg border border-line">
+        <ul className="divide-y divide-line/70 rounded-2xl border border-line">
           {users.map((u) => {
             const role = roles.find((r) => r.id === u.roleId);
             return (

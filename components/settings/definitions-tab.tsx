@@ -27,7 +27,7 @@ export function DefinitionsTab() {
             </div>
             {sec.kind === "priority" && manage ? <Button size="sm" onClick={async () => { if ((await resetDefinitions()).ok) toast("Definitions reset to defaults"); }}><RotateCcw className="size-3.5" /> Reset all</Button> : null}
           </div>
-          <ul className="divide-y divide-line rounded-lg border border-line">
+          <ul className="divide-y divide-line/70 rounded-2xl border border-line">
             {sec.items.map((i) => (
               <li key={i.key} className="grid gap-2 px-4 py-3 sm:grid-cols-[120px_minmax(0,1fr)] sm:items-start sm:gap-6">
                 <div className="pt-1.5">{i.badge}</div>

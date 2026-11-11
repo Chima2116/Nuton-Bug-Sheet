@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { ArrowRight, CornerDownLeft, Plus, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useReport } from "@/components/report/report-host";
 import { Kbd } from "@/components/ui/controls";
 import { StatusBadge } from "@/components/ui/badges";
 import { useActiveBugs, useModuleMap, useUserMap, usePerms } from "@/lib/hooks";
@@ -14,6 +15,7 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const modules = useModuleMap();
   const users = useUserMap();
   const { can } = usePerms();
+  const { open: openReport } = useReport();
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -36,10 +38,10 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const actions = useMemo(() => {
     const a: { id: string; label: string; icon: React.ReactNode; run: () => void }[] = [];
-    if (can("report")) a.push({ id: "report", label: "Report a bug", icon: <Plus className="size-4" />, run: () => router.push("/report") });
+    if (can("report")) a.push({ id: "report", label: "New bug", icon: <Plus className="size-4" />, run: () => openReport() });
     if (q.trim()) a.push({ id: "all", label: `See all results for “${q.trim()}” in All Bugs`, icon: <ArrowRight className="size-4" />, run: () => router.push(`/bugs?q=${encodeURIComponent(q.trim())}`) });
     return a;
-  }, [can, q, router]);
+  }, [can, q, router, openReport]);
 
   const total = results.length + actions.length;
   const go = (i: number) => {
@@ -55,7 +57,7 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/30" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/35 backdrop-blur-[2px]" />
         <Dialog.Content
           aria-describedby={undefined}
           className="fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-32px)] max-w-[600px] -translate-x-1/2 animate-pop-in overflow-hidden rounded-xl border border-line bg-white shadow-[var(--shadow-pop)] focus:outline-none"

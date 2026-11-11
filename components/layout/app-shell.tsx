@@ -2,6 +2,8 @@
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { BugDrawerProvider } from "@/components/bugs/bug-drawer";
+import { ReportProvider } from "@/components/report/report-host";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/overlay";
 import { useAuth } from "@/lib/auth";
@@ -18,7 +20,7 @@ const PUBLIC = ["/login", "/reset-password"];
 
 function Splash() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-white text-muted">
+    <div className="flex min-h-dvh items-center justify-center bg-canvas text-muted">
       <Loader2 className="size-5 animate-spin" aria-label="Loading" />
     </div>
   );
@@ -57,21 +59,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-white">
-      <aside className="hidden w-[232px] shrink-0 border-r border-line bg-white lg:block">
+    <ReportProvider>
+    <BugDrawerProvider>
+    <div className="flex h-dvh overflow-hidden bg-canvas">
+      <aside className="hidden w-[236px] shrink-0 lg:block">
         <SidebarContent />
       </aside>
       <Sheet open={drawer} onOpenChange={setDrawer} title="Navigation" side="left" width="sm:w-[272px] w-[272px]">
-        <div className="-mx-6 -my-5 h-[calc(100dvh-65px)]">
+        <div className="-mx-6 -my-5 h-[calc(100dvh-81px)] bg-canvas">
           <SidebarContent onNavigate={() => setDrawer(false)} />
         </div>
       </Sheet>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenu={() => setDrawer(true)} />
-        <main id="main" className="min-h-0 flex-1 overflow-y-auto">
-          {ready ? children : <Skeleton />}
-        </main>
+      <div className="flex min-w-0 flex-1 flex-col p-0 sm:p-2 lg:pl-0">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white sm:rounded-[20px] sm:shadow-[var(--shadow-card)]">
+          <Topbar onMenu={() => setDrawer(true)} />
+          <main id="main" className="min-h-0 flex-1 overflow-y-auto">
+            {ready ? children : <Skeleton />}
+          </main>
+        </div>
       </div>
+
     </div>
+    </BugDrawerProvider>
+    </ReportProvider>
   );
 }

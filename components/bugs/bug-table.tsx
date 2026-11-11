@@ -16,19 +16,19 @@ import type { Sort, SortKey } from "./filters";
 export type ColumnId = "id" | "title" | "module" | "severity" | "priority" | "status" | "assignee" | "reporter" | "reportedAt" | "updatedAt";
 
 export const COLUMNS: { id: ColumnId; label: string; width: number; sort: SortKey; locked?: boolean }[] = [
-  { id: "id", label: "Bug ID", width: 100, sort: "id", locked: true },
-  { id: "title", label: "Bug Title", width: 0, sort: "title", locked: true },
+  { id: "id", label: "ID", width: 96, sort: "id", locked: true },
+  { id: "title", label: "Bug", width: 0, sort: "title", locked: true },
   { id: "module", label: "Module", width: 156, sort: "module" },
-  { id: "severity", label: "Severity", width: 100, sort: "severity" },
-  { id: "priority", label: "Priority", width: 84, sort: "priority" },
-  { id: "status", label: "Status", width: 164, sort: "status" },
+  { id: "severity", label: "Severity", width: 112, sort: "severity" },
+  { id: "priority", label: "Priority", width: 92, sort: "priority" },
+  { id: "status", label: "Status", width: 168, sort: "status" },
   { id: "assignee", label: "Assignee", width: 164, sort: "assignee" },
   { id: "reporter", label: "Reporter", width: 164, sort: "reporter" },
   { id: "reportedAt", label: "Date Reported", width: 124, sort: "reportedAt" },
   { id: "updatedAt", label: "Last Updated", width: 116, sort: "updatedAt" },
 ];
 
-const cell = "h-11 border-b border-r border-line/70 px-3 align-middle last:border-r-0";
+const cell = "h-[54px] border-b border-line/70 px-3 align-middle first:pl-5 last:pr-5";
 const CHECK_W = 40;
 const TITLE_MIN = 300;
 
@@ -43,6 +43,8 @@ export function BugTable({
   onToggleAll,
   className,
   emptyState,
+  onOpen,
+  activeId,
   maxHeightClass = "max-h-[calc(100dvh-380px)] min-h-[320px]",
 }: {
   bugs: Bug[];
@@ -55,9 +57,12 @@ export function BugTable({
   onToggleAll?: (all: boolean) => void;
   className?: string;
   emptyState?: React.ReactNode;
+  onOpen?: (b: Bug) => void;
+  activeId?: string | null;
   maxHeightClass?: string;
 }) {
   const router = useRouter();
+  const open = (b: Bug) => (onOpen ? onOpen(b) : router.push(`/bugs/${b.id}`));
   const users = useUserMap();
   const modules = useModuleMap();
   const { can } = usePerms();
@@ -70,7 +75,7 @@ export function BugTable({
   const stick = (id: ColumnId | "check") => {
     if (id === "check") return "lg:sticky lg:left-0";
     if (id === "id") return "lg:sticky";
-    if (id === "title") return "lg:sticky lg:shadow-[1px_0_0_var(--color-line-strong)]";
+    if (id === "title") return "lg:sticky";
     return "";
   };
   const stickStyle = (id: ColumnId | "check") => (id === "id" ? { left: idLeft } : id === "title" ? { left: titleLeft } : undefined);
@@ -80,26 +85,26 @@ export function BugTable({
   const render = (b: Bug, id: ColumnId) => {
     switch (id) {
       case "id":
-        return <span className="tnum whitespace-nowrap text-[13px] text-muted">{b.id}</span>;
+        return <span className="tnum whitespace-nowrap text-xs font-medium text-muted">{b.id}</span>;
       case "title":
         return (
-          <span className="block truncate text-[13.5px] font-medium text-ink" title={b.title}>
+          <span className="block truncate text-[13.5px] font-medium tracking-[-0.005em] text-ink" title={b.title}>
             {b.title}
           </span>
         );
       case "module":
         return <span className="block truncate text-[13px] text-ink-2">{modules.get(b.moduleId)?.name ?? "—"}</span>;
       case "severity":
-        return <SeverityBadge severity={b.severity} />;
+        return <SeverityBadge severity={b.severity} pill />;
       case "priority":
         return <PriorityBadge priority={b.priority} />;
       case "status": {
-        const inner = <StatusBadge status={b.status} verified={!!b.verifiedAt} />;
+        const inner = <StatusBadge status={b.status} verified={!!b.verifiedAt} pill />;
         if (!can("progress") && !can("verify")) return inner;
         return (
           <Menu>
             <MenuTrigger asChild>
-              <button onClick={(e) => e.stopPropagation()} className="group -mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-wash-2 data-[state=open]:bg-wash-2" aria-label={`Change status of ${b.id}`}>
+              <button onClick={(e) => e.stopPropagation()} className="group -mx-1 inline-flex items-center gap-1 rounded-full px-1 py-0.5 hover:bg-wash-2 data-[state=open]:bg-wash-2" aria-label={`Change status of ${b.id}`}>
                 {inner}
                 <ChevronDown className="size-3 text-faint opacity-0 group-hover:opacity-100 group-data-[state=open]:opacity-100" />
               </button>
@@ -161,7 +166,7 @@ export function BugTable({
   };
 
   return (
-    <div className={cn("overflow-auto rounded-lg border border-line bg-white", maxHeightClass, className)}>
+    <div className={cn("overflow-auto rounded-2xl border border-line bg-white", maxHeightClass, className)}>
       <table className="w-full table-fixed border-separate border-spacing-0 text-left" style={{ minWidth: fixedWidth + TITLE_MIN }}>
         <colgroup>
           {selectable ? <col style={{ width: CHECK_W }} /> : null}
@@ -172,16 +177,16 @@ export function BugTable({
         <thead>
           <tr>
             {selectable ? (
-              <th className={cn("sticky top-0 z-30 h-10 border-b border-r border-line/70 bg-wash px-3", stick("check"))}>
+              <th className={cn("sticky top-0 z-30 h-11 border-b border-line bg-white px-3 pl-5", stick("check"))}>
                 <Checkbox checked={allSelected} indeterminate={!allSelected && someSelected} onChange={(v) => onToggleAll?.(v)} label="Select all rows on this page" />
               </th>
             ) : null}
             {cols.map((c) => {
               const active = sort?.key === c.sort;
               return (
-                <th key={c.id} style={stickStyle(c.id)} aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"} className={cn("sticky top-0 h-10 border-b border-r border-line/70 bg-wash px-3 text-xs font-medium text-muted last:border-r-0", stick(c.id) ? "z-30" : "z-20", stick(c.id))}>
+                <th key={c.id} style={stickStyle(c.id)} aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"} className={cn("sticky top-0 h-11 border-b border-line bg-white px-3 text-xs font-medium text-muted first:pl-5 last:pr-5", stick(c.id) ? "z-30" : "z-20", stick(c.id))}>
                   {onSort ? (
-                    <button onClick={() => onSort(c.sort)} className={cn("-mx-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 hover:text-ink", active && "text-ink")}>
+                    <button onClick={() => onSort(c.sort)} className={cn("-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:text-ink", active && "text-ink")}>
                       {c.label}
                       {active ? sort!.dir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : <ChevronsUpDown className="size-3 text-faint" />}
                     </button>
@@ -200,19 +205,19 @@ export function BugTable({
               <tr
                 key={b.id}
                 tabIndex={0}
-                onClick={() => router.push(`/bugs/${b.id}`)}
+                onClick={() => open(b)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && e.target === e.currentTarget) router.push(`/bugs/${b.id}`);
+                  if (e.key === "Enter" && e.target === e.currentTarget) open(b);
                 }}
-                className={cn("group cursor-pointer transition-colors focus-visible:outline-offset-[-2px]", isSel ? "bg-olive-50" : "hover:bg-wash")}
+                className={cn("group cursor-pointer transition-colors focus-visible:outline-offset-[-2px]", isSel ? "bg-olive-50" : "hover:bg-wash/70")}
               >
                 {selectable ? (
-                  <td className={cn(cell, "z-10", stick("check"), isSel ? "bg-olive-50" : "bg-white group-hover:bg-wash")} onClick={(e) => e.stopPropagation()}>
+                  <td className={cn(cell, "z-10", stick("check"), isSel ? "bg-olive-50" : "bg-white group-hover:bg-wash/70")} onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={!!isSel} onChange={() => onToggle?.(b.id)} label={`Select ${b.id}`} />
                   </td>
                 ) : null}
                 {cols.map((c) => (
-                  <td key={c.id} style={stickStyle(c.id)} className={cn(cell, "overflow-hidden", stick(c.id) && "z-10", stick(c.id), stick(c.id) && (isSel ? "bg-olive-50" : "bg-white group-hover:bg-wash"))}>
+                  <td key={c.id} style={stickStyle(c.id)} className={cn(cell, "overflow-hidden", stick(c.id) && "z-10", stick(c.id), stick(c.id) && (isSel ? "bg-olive-50" : "bg-white group-hover:bg-wash/70"))}>
                     {render(b, c.id)}
                   </td>
                 ))}

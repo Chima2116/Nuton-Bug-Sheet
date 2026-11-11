@@ -27,24 +27,24 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/30" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/35 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 flex max-h-[88dvh] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 animate-pop-in flex-col rounded-xl border border-line bg-white shadow-[var(--shadow-pop)] focus:outline-none",
+            "fixed left-1/2 top-1/2 z-50 flex max-h-[88dvh] w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 animate-pop-in flex-col rounded-[20px] bg-white shadow-[var(--shadow-modal)] focus:outline-none",
             width,
           )}
         >
-          <div className="flex items-start justify-between gap-4 px-6 pt-5">
+          <div className="flex items-start justify-between gap-4 px-7 pt-6">
             <div className="min-w-0">
-              <Dialog.Title className="text-[15px] font-semibold text-ink">{title}</Dialog.Title>
+              <Dialog.Title className="text-base font-semibold tracking-[-0.01em] text-ink">{title}</Dialog.Title>
               {description ? <Dialog.Description className="mt-1 text-[13px] text-muted">{description}</Dialog.Description> : <Dialog.Description className="sr-only">{title}</Dialog.Description>}
             </div>
             <Dialog.Close className="-mr-2 -mt-1 rounded-md p-1.5 text-muted hover:bg-wash hover:text-ink" aria-label="Close">
               <X className="size-4" />
             </Dialog.Close>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
-          {footer ? <div className="flex items-center justify-end gap-2 border-t border-line px-6 py-3.5">{footer}</div> : null}
+          <div className="min-h-0 flex-1 overflow-y-auto px-7 py-4">{children}</div>
+          {footer ? <div className="flex items-center justify-end gap-2 px-7 pb-5 pt-2">{footer}</div> : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -74,11 +74,11 @@ export function Sheet({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/30" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink/35 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
-            "fixed inset-y-0 z-50 flex w-full flex-col bg-white shadow-[var(--shadow-sheet)] focus:outline-none",
-            side === "right" ? "right-0 animate-slide-in-right border-l border-line" : "left-0 animate-slide-in-left border-r border-line",
+            "fixed z-50 flex w-full max-w-[calc(100vw-16px)] flex-col bg-white shadow-[var(--shadow-sheet)] focus:outline-none inset-y-2 rounded-[20px]",
+            side === "right" ? "right-2 animate-slide-in-right" : "left-2 animate-slide-in-left",
             width,
           )}
         >
@@ -110,7 +110,7 @@ export function MenuContent({ className, align = "end", ...rest }: ComponentProp
         align={align}
         sideOffset={6}
         collisionPadding={12}
-        className={cn("z-[60] min-w-[200px] animate-pop-in rounded-lg bg-white p-1 shadow-[var(--shadow-pop)]", className)}
+        className={cn("z-[60] min-w-[200px] animate-pop-in rounded-xl bg-white p-1.5 shadow-[var(--shadow-pop)]", className)}
         {...rest}
       />
     </Dropdown.Portal>
@@ -118,7 +118,7 @@ export function MenuContent({ className, align = "end", ...rest }: ComponentProp
 }
 
 const menuItemBase =
-  "flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-wash";
+  "flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[highlighted]:bg-wash";
 
 export function MenuItem({ className, danger, selected, icon, children, asChild, ...rest }: ComponentProps<typeof Dropdown.Item> & { danger?: boolean; selected?: boolean; icon?: ReactNode }) {
   const cls = cn(menuItemBase, danger ? "text-st-reopened" : "text-ink", className);
@@ -154,7 +154,7 @@ export function PopoverContent({ className, align = "start", ...rest }: Componen
         align={align}
         sideOffset={6}
         collisionPadding={12}
-        className={cn("z-[60] animate-pop-in rounded-lg bg-white shadow-[var(--shadow-pop)] focus:outline-none", className)}
+        className={cn("z-[60] animate-pop-in rounded-xl bg-white shadow-[var(--shadow-pop)] focus:outline-none", className)}
         {...rest}
       />
     </Pop.Portal>

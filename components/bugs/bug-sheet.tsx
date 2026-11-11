@@ -2,8 +2,9 @@
 import { BadgeCheck, Plus, ChevronLeft, ChevronRight, Columns3, Download, Search, UserRound, X, ListChecks } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
-import { Checkbox, EmptyState, Segmented } from "@/components/ui/controls";
+import { Button } from "@/components/ui/button";
+import { useReport } from "@/components/report/report-host";
+import { Checkbox, EmptyState, UnderlineTabs } from "@/components/ui/controls";
 import { Input } from "@/components/ui/field";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger, Popover, PopoverContent, PopoverTrigger } from "@/components/ui/overlay";
 import { useToast } from "@/components/ui/toast";
@@ -13,6 +14,7 @@ import { segmentMatches } from "@/lib/queries";
 import { assignBug, changeStatus, verifyBug } from "@/lib/store";
 import { SEVERITIES, STATUSES, type Bug, type Severity, type Status } from "@/lib/types";
 import { csvCell, downloadText, formatDate, plural } from "@/lib/utils";
+import { useBugDrawer } from "./bug-drawer";
 import { BugTable, COLUMNS, type ColumnId } from "./bug-table";
 import { DateFilter, FilterMenu } from "./filter-menu";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters, sortBugs, type Filters, type Sort, type SortKey } from "./filters";
@@ -37,6 +39,8 @@ export function BugSheet({
   const moduleMap = useModuleMap();
   const devs = useAssignable();
   const { toast } = useToast();
+  const { open: openReport } = useReport();
+  const drawer = useBugDrawer();
 
   const [filters, setFilters] = useState<Filters>(() => {
     const f = { ...EMPTY_FILTERS };
@@ -138,9 +142,9 @@ export function BugSheet({
   const statusOptions = STATUSES.map((s) => ({ value: s, label: s, dot: STATUS_META[s].dot }));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {showSegments ? (
-        <Segmented
+        <UnderlineTabs
           value={filters.segment}
           onChange={(v) => patch({ segment: v, status: [] })}
           options={SEGMENTS.map((s) => ({ id: s.id, label: s.label, count: segCounts[s.id] }))}
@@ -149,8 +153,8 @@ export function BugSheet({
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-[260px]">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-faint" />
-          <Input value={filters.q} onChange={(e) => patch({ q: e.target.value })} placeholder="Search bugs" className="h-8 pl-8 pr-7 text-[13px]" aria-label="Search bugs" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
+          <Input value={filters.q} onChange={(e) => patch({ q: e.target.value })} placeholder="Search bugs" className="h-9 rounded-full border-transparent bg-wash-2/70 pl-9 pr-8 text-[13px] hover:border-transparent focus:bg-white" aria-label="Search bugs" />
           {filters.q ? (
             <button onClick={() => patch({ q: "" })} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-faint hover:text-ink" aria-label="Clear search">
               <X className="size-3.5" />
@@ -176,7 +180,7 @@ export function BugSheet({
         <div className="ml-auto flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button size="md"><Columns3 className="size-4" /> <span className="hidden sm:inline">Columns</span></Button>
+              <Button size="md" className="rounded-full"><Columns3 className="size-4" /> <span className="hidden sm:inline">Columns</span></Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[220px] p-1.5">
               <p className="px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-wide text-faint">Visible columns</p>
@@ -191,14 +195,14 @@ export function BugSheet({
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="md" onClick={() => exportCsv(filtered)} disabled={!filtered.length}>
+          <Button size="md" className="rounded-full" onClick={() => exportCsv(filtered)} disabled={!filtered.length}>
             <Download className="size-4" /> <span className="hidden sm:inline">Export</span>
           </Button>
         </div>
       </div>
 
       {selected.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-olive-200 bg-olive-50 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-olive-200 bg-olive-50 px-4 py-2.5">
           <span className="mr-1 text-[13px] font-medium text-olive-800">{selected.size} selected</span>
           {can("assign") ? (
             <Menu>
@@ -242,6 +246,7 @@ export function BugSheet({
           sort={sort}
           onSort={onSort}
           selectable
+          onOpen={(b) => drawer.open(b.id, filtered.map((x) => x.id))}
           selected={selected}
           onToggle={(id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; })}
           onToggleAll={(all) => setSelected((s) => { const n = new Set(s); rows.forEach((b) => (all ? n.add(b.id) : n.delete(b.id))); return n; })}
@@ -250,7 +255,7 @@ export function BugSheet({
               icon={<Search className="size-4" />}
               title={anyFilter ? "No bugs match these filters" : emptyTitle}
               body={anyFilter ? "Try removing a filter or searching for something else." : emptyBody}
-              action={anyFilter ? <Button onClick={() => { setFilters(EMPTY_FILTERS); setPage(1); }}>Clear filters</Button> : can("report") ? <ButtonLink href="/report" variant="primary"><Plus className="size-4" strokeWidth={2.25} /> Report your first bug</ButtonLink> : undefined}
+              action={anyFilter ? <Button onClick={() => { setFilters(EMPTY_FILTERS); setPage(1); }}>Clear filters</Button> : can("report") ? <Button variant="primary" className="rounded-full" onClick={() => openReport()}><Plus className="size-4" strokeWidth={2.25} /> New bug</Button> : undefined}
             />
           }
         />
@@ -261,7 +266,7 @@ export function BugSheet({
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2">
               Rows
-              <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="h-7 rounded-md border border-line-strong bg-white px-1.5 text-[13px] text-ink">
+              <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="h-8 rounded-lg border border-line-strong bg-white px-1.5 text-[13px] text-ink">
                 {[10, 25, 50].map((n) => <option key={n}>{n}</option>)}
               </select>
             </label>

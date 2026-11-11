@@ -1,14 +1,16 @@
 "use client";
 import { FileText } from "lucide-react";
 import { Suspense } from "react";
+import { useReport } from "@/components/report/report-host";
 import { BugSheet } from "@/components/bugs/bug-sheet";
 import { PageBody, PageHeader } from "@/components/layout/page-header";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useActiveBugs, useDrafts } from "@/lib/hooks";
 
 export default function AllBugsPage() {
   const bugs = useActiveBugs();
   const drafts = useDrafts();
+  const { open } = useReport();
   return (
     <PageBody wide>
       <PageHeader
@@ -17,9 +19,9 @@ export default function AllBugsPage() {
         actions={
           <>
             {drafts.length ? (
-              <ButtonLink href="/report#drafts" variant="secondary">
+              <Button variant="secondary" className="rounded-full" onClick={() => open()}>
                 <FileText className="size-4" /> Drafts <span className="tnum text-muted">{drafts.length}</span>
-              </ButtonLink>
+              </Button>
             ) : null}
           </>
         }
