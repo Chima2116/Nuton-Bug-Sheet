@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { BUCKET, supabase } from "./supabase";
+import { MAX_IMAGE_B64, type StructureImage } from "./ai/structure";
 import type { Attachment, CaptureMeta } from "./types";
 
 export const MAX_FILE_BYTES = 50 * 1024 * 1024; // matches the bucket limit in the migration
@@ -36,6 +37,47 @@ export function useAttachmentUrl(att: Attachment | undefined) {
     };
   }, [att?.id, att?.path]); // eslint-disable-line react-hooks/exhaustive-deps
   return url;
+}
+
+const analysisCache = new Map<string, StructureImage | null>();
+
+/** A small JPEG copy of a screenshot for the model to read. The stored original is never touched. */
+export async function imageForAnalysis(att: Attachment): Promise<StructureImage | null> {
+  if (att.kind !== "image") return null;
+  if (analysisCache.has(att.id)) return analysisCache.get(att.id) ?? null;
+  let out: StructureImage | null = null;
+  try {
+    const url = await signedUrl(att);
+    if (url) {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const scale = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        for (const q of [0.82, 0.7, 0.55]) {
+          const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", q));
+          if (!blob) break;
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          let bin = "";
+          for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          const data = btoa(bin);
+          if (data.length <= MAX_IMAGE_B64) {
+            out = { mediaType: "image/jpeg", data };
+            break;
+          }
+        }
+      }
+    }
+  } catch {
+    out = null;
+  }
+  analysisCache.set(att.id, out);
+  return out;
 }
 
 function safeName(name: string) {

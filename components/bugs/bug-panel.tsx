@@ -194,6 +194,19 @@ export function BugPanel({ bug, toolbar, className }: { bug: Bug; toolbar?: Reac
               </div>
             ) : null}
 
+            {bug.requiredFix.length ? (
+              <Block title="Required correction">
+                <ol className="space-y-2.5">
+                  {bug.requiredFix.map((s, i) => (
+                    <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-ink">
+                      <span className="tnum mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-olive-50 text-xs font-medium text-olive-800">{i + 1}</span>
+                      {s}
+                    </li>
+                  ))}
+                </ol>
+              </Block>
+            ) : null}
+
             {bug.originalReport ? (
               <details className="group rounded-2xl border border-line">
                 <summary className="flex cursor-pointer list-none items-center justify-between rounded-2xl px-4 py-3 text-[13px] text-ink-2 hover:bg-wash">

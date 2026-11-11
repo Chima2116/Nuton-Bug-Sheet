@@ -78,6 +78,7 @@ function toBug(r: any): Bug {
     steps: r.steps ?? [],
     expected: r.expected,
     actual: r.actual,
+    requiredFix: r.required_fix ?? [],
     severity: r.severity,
     priority: r.priority,
     category: r.category,
@@ -201,6 +202,7 @@ export interface NewBugInput {
   steps: string[];
   expected: string;
   actual: string;
+  requiredFix?: string[];
   severity: Severity;
   priority: Priority;
   category: Bug["category"];
@@ -216,10 +218,15 @@ export async function createBugs(inputs: NewBugInput[]): Promise<string[] | null
   if (!supabase) return null;
   const rows = inputs.map((i) => ({
     title: i.title, description: i.description, steps: i.steps, expected: i.expected, actual: i.actual,
+    ...(i.requiredFix?.length ? { required_fix: i.requiredFix } : {}),
     severity: i.severity, priority: i.priority, category: i.category, module_id: i.moduleId || null, environment: i.environment,
     reporter_id: state.currentUserId, original_report: i.originalReport,
   }));
-  const { data, error } = await supabase.from("bugs").insert(rows).select("id, seq");
+  let { data, error } = await supabase.from("bugs").insert(rows).select("id, seq");
+  // Migration 0004 not run yet: save the bug without the correction list rather than failing.
+  if (error && /required_fix/i.test(error.message)) {
+    ({ data, error } = await supabase.from("bugs").insert(rows.map(({ required_fix: _r, ...rest }: Record<string, unknown>) => rest)).select("id, seq")); // eslint-disable-line @typescript-eslint/no-unused-vars
+  }
   if (error || !data) {
     fail(error);
     return null;
@@ -241,7 +248,7 @@ export async function createBugs(inputs: NewBugInput[]): Promise<string[] | null
 
 const COLUMN: Partial<Record<keyof Bug, string>> = {
   title: "title", description: "description", steps: "steps", expected: "expected", actual: "actual", severity: "severity",
-  priority: "priority", category: "category", moduleId: "module_id", environment: "environment", devNotes: "dev_notes", fixDescription: "fix_description",
+  priority: "priority", category: "category", moduleId: "module_id", environment: "environment", requiredFix: "required_fix", devNotes: "dev_notes", fixDescription: "fix_description",
 };
 
 export async function updateBugFields(id: string, patch: Partial<Bug>, summary?: string): Promise<Result> {

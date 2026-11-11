@@ -13,6 +13,7 @@ export interface FieldValues {
   steps: string[];
   expected: string;
   actual: string;
+  requiredFix: string[];
   severity: Severity | "";
   priority: Priority | "";
   category: Category | "";
@@ -55,7 +56,7 @@ function Row({ label, htmlFor, flag, empty, error, required, hint, children, cla
   );
 }
 
-function Steps({ steps, onChange, invalid }: { steps: string[]; onChange: (s: string[]) => void; invalid?: boolean }) {
+function Steps({ steps, onChange, invalid, noun = "step" }: { steps: string[]; onChange: (s: string[]) => void; invalid?: boolean; noun?: string }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const focus = (i: number) => requestAnimationFrame(() => refs.current[i]?.focus());
   const list = steps.length ? steps : [];
@@ -67,7 +68,7 @@ function Steps({ steps, onChange, invalid }: { steps: string[]; onChange: (s: st
           <Input
             ref={(el) => { refs.current[i] = el; }}
             value={s}
-            aria-label={`Step ${i + 1}`}
+            aria-label={`${noun} ${i + 1}`}
             onChange={(e) => onChange(list.map((x, j) => (j === i ? e.target.value : x)))}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -83,7 +84,7 @@ function Steps({ steps, onChange, invalid }: { steps: string[]; onChange: (s: st
             }}
             className={cn("h-9", invalid && "border-st-reopened")}
           />
-          <button type="button" onClick={() => onChange(list.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-faint hover:bg-wash hover:text-ink" aria-label={`Remove step ${i + 1}`}>
+          <button type="button" onClick={() => onChange(list.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-faint hover:bg-wash hover:text-ink" aria-label={`Remove ${noun} ${i + 1}`}>
             <X className="size-4" />
           </button>
         </div>
@@ -93,7 +94,7 @@ function Steps({ steps, onChange, invalid }: { steps: string[]; onChange: (s: st
         onClick={() => { onChange([...list, ""]); focus(list.length); }}
         className="inline-flex items-center gap-1.5 rounded-md py-1 text-[13px] font-medium text-olive-700 hover:text-olive-800"
       >
-        <Plus className="size-3.5" /> Add step
+        <Plus className="size-3.5" /> Add {noun}
       </button>
     </div>
   );
@@ -133,6 +134,9 @@ export function BugFields({ values, onChange, flags = {}, errors = {}, idPrefix 
       </section>
 
       <section className="space-y-5">
+        <Row label="Required correction" flag={flags.requiredFix} empty={empty("requiredFix")} hint="What has to change, and how we will know it is fixed.">
+          <Steps steps={values.requiredFix} noun="point" onChange={(requiredFix) => onChange({ requiredFix })} />
+        </Row>
         <div className="grid gap-5 md:grid-cols-2">
           <Row label="Severity" flag={flags.severity} empty={empty("severity")} error={err("severity")} required>
             <div role="radiogroup" aria-label="Severity" className="flex flex-wrap gap-1.5">

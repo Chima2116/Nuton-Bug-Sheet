@@ -109,6 +109,8 @@ export interface Bug {
   steps: string[];
   expected: string;
   actual: string;
+  /** What needs to change, and how we will know it is fixed. */
+  requiredFix: string[];
   severity: Severity;
   priority: Priority;
   category: Category;

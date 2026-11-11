@@ -8,10 +8,10 @@ import { updateBugFields } from "@/lib/store";
 import type { Bug } from "@/lib/types";
 import { BugFields, type Errors, type FieldKey, type FieldValues } from "./bug-fields";
 
-const LABELS: Record<FieldKey, string> = { title: "title", description: "description", steps: "steps to reproduce", expected: "expected behaviour", actual: "actual behaviour", severity: "severity", priority: "priority", category: "category", moduleId: "module", environment: "environment" };
+const LABELS: Record<FieldKey, string> = { title: "title", description: "description", steps: "steps to reproduce", expected: "expected behaviour", actual: "actual behaviour", requiredFix: "required correction", severity: "severity", priority: "priority", category: "category", moduleId: "module", environment: "environment" };
 
 function toValues(b: Bug): FieldValues {
-  return { title: b.title, description: b.description, steps: b.steps, expected: b.expected, actual: b.actual, severity: b.severity, priority: b.priority, category: b.category, moduleId: b.moduleId, environment: b.environment };
+  return { title: b.title, description: b.description, steps: b.steps, expected: b.expected, actual: b.actual, requiredFix: b.requiredFix, severity: b.severity, priority: b.priority, category: b.category, moduleId: b.moduleId, environment: b.environment };
 }
 
 export function EditSheet({ bug, open, onOpenChange }: { bug: Bug; open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -46,6 +46,7 @@ export function EditSheet({ bug, open, onOpenChange }: { bug: Bug; open: boolean
         steps: values.steps.map((s) => s.trim()).filter(Boolean),
         expected: values.expected.trim(),
         actual: values.actual.trim(),
+        ...(changed.includes("requiredFix") ? { requiredFix: values.requiredFix.map((s) => s.trim()).filter(Boolean) } : {}),
         severity: values.severity as Bug["severity"],
         priority: values.priority as Bug["priority"],
         category: values.category as Bug["category"],

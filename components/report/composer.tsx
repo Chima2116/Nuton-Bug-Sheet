@@ -9,7 +9,7 @@ import { Kbd } from "@/components/ui/controls";
 import { Input, Textarea } from "@/components/ui/field";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/overlay";
 import { useToast } from "@/components/ui/toast";
-import { deleteAttachment, ingestFiles, useAttachmentUrl } from "@/lib/blobs";
+import { deleteAttachment, imageForAnalysis, ingestFiles, useAttachmentUrl } from "@/lib/blobs";
 import { SEVERITY_META, SEVERITY_TO_PRIORITY } from "@/lib/constants";
 import { useAssignable, useDefinitions, useDrafts, useMe, useModules } from "@/lib/hooks";
 import { createBugs, deleteDraft, saveDraft } from "@/lib/store";
@@ -21,6 +21,10 @@ const MIN_CHARS_TO_ANALYSE = 24;
 const ANALYSE_DELAY = 1100;
 
 type Edits = Partial<UnderstoodBug>;
+
+const MIN_WITH_IMAGE = 8;
+const keyOf = (t: string, list: Attachment[]) => `${t}\u0001${list.filter((a) => a.kind === "image").slice(0, 3).map((a) => a.id).join(",")}`;
+const canAnalyse = (t: string, list: Attachment[]) => t.length >= MIN_CHARS_TO_ANALYSE || (t.length >= MIN_WITH_IMAGE && list.some((a) => a.kind === "image"));
 
 const stepsToText = (steps: string[]) => steps.join("\n");
 const textToSteps = (t: string) => t.split("\n").map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, "").trim()).filter(Boolean);
@@ -115,15 +119,17 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
 
   /* ---------- understanding ---------- */
   const analyse = useCallback(
-    async (t: string): Promise<Understanding | null> => {
+    async (t: string, list: Attachment[]): Promise<Understanding | null> => {
       abort.current?.abort();
       const ctl = new AbortController();
       abort.current = ctl;
       setAnalysing(true);
       try {
-        const r = await understand(t, { modules, definitions, signal: ctl.signal });
+        const images = (await Promise.all(list.filter((a) => a.kind === "image").slice(0, 3).map(imageForAnalysis))).filter((i): i is NonNullable<typeof i> => !!i);
         if (ctl.signal.aborted) return null;
-        analysed.current = t;
+        const r = await understand(t, { modules, definitions, images, signal: ctl.signal });
+        if (ctl.signal.aborted) return null;
+        analysed.current = keyOf(t, list);
         setResult(r);
         setEdits((prev) => (prev.length === r.bugs.length ? prev : r.bugs.map(() => ({}))));
         setActive((a) => Math.min(a, Math.max(0, r.bugs.length - 1)));
@@ -140,18 +146,18 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
   useEffect(() => {
     if (!open) return;
     const t = text.trim();
-    if (t.length < MIN_CHARS_TO_ANALYSE) {
+    if (!canAnalyse(t, files)) {
       abort.current?.abort();
       setAnalysing(false);
       if (result) setResult(null);
       analysed.current = "";
       return;
     }
-    if (t === analysed.current) return;
-    const timer = setTimeout(() => void analyse(t), ANALYSE_DELAY);
+    if (keyOf(t, files) === analysed.current) return;
+    const timer = setTimeout(() => void analyse(t, files), ANALYSE_DELAY);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, open, analyse]);
+  }, [text, files, open, analyse]);
 
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -205,8 +211,8 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
     const t = text.trim();
     if (!t || creating || !me) return;
     setCreating(true);
-    let final: { bugs: UnderstoodBug[] } | null = result && analysed.current === t ? result : null;
-    if (!final) final = await analyse(t);
+    let final: { bugs: UnderstoodBug[] } | null = result && analysed.current === keyOf(t, files) ? result : null;
+    if (!final) final = await analyse(t, files);
     if (!final) final = { bugs: understandBasic(t, modules) };
     const byName = new Map(modules.map((m) => [m.name.toLowerCase(), m.id]));
     const inputs = final.bugs.map((b, i) => {
@@ -220,6 +226,7 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
         steps: v.steps,
         expected: v.expected,
         actual: v.actual,
+        requiredFix: v.requiredFix,
         severity,
         priority,
         category: v.category || ("Functional" as const),
@@ -244,7 +251,7 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
   };
 
   const noteDrafts = useMemo(() => drafts.filter((d) => d.id !== id && (d.kind === "note" || d.kind === "form" || d.original)), [drafts, id]);
-  const showPanel = text.trim().length >= MIN_CHARS_TO_ANALYSE;
+  const showPanel = canAnalyse(text.trim(), files);
   const sev = cur?.severity || "";
   const pri = cur?.priority || "";
   const modName = cur?.module || "";
@@ -393,6 +400,12 @@ export function Composer({ open, draftId, onOpenChange, onPickDraft }: { open: b
                           <p className="mb-1.5 text-xs font-medium text-muted">Actual</p>
                           <Textarea autoGrow value={cur.actual} onChange={(e) => edit(active, { actual: e.target.value })} className="min-h-[44px] bg-white" aria-label="Actual result" />
                         </div>
+                      </div>
+                    ) : null}
+                    {cur.requiredFix.length || touched("requiredFix") ? (
+                      <div>
+                        <p className="mb-1.5 text-xs font-medium text-muted">Required correction</p>
+                        <Textarea autoGrow key={`fix-${active}-${result?.source}`} defaultValue={stepsToText(cur.requiredFix)} onChange={(e) => edit(active, { requiredFix: textToSteps(e.target.value) })} className="bg-white" aria-label="Required correction" placeholder="One point per line" />
                       </div>
                     ) : null}
                     {cur.environment ? <p className="text-xs text-muted">Environment: <span className="text-ink-2">{cur.environment}</span></p> : null}

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
-import { buildSystemPrompt, buildUserMessage, MAX_NOTE_CHARS, OUTPUT_SCHEMA, parseModelOutput, type StructureRequest } from "@/lib/ai/structure";
+import { buildSystemPrompt, buildUserContent, MAX_IMAGE_B64, MAX_IMAGES, MAX_NOTE_CHARS, OUTPUT_SCHEMA, parseModelOutput, type StructureImage, type StructureRequest } from "@/lib/ai/structure";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -62,14 +62,19 @@ export async function POST(req: Request) {
   if (text.length > MAX_NOTE_CHARS) return NextResponse.json({ error: "too_long" }, { status: 413 });
   const modules = (Array.isArray(body.modules) ? body.modules : []).slice(0, 60).map((m) => ({ name: String(m.name ?? "").slice(0, 80), description: String(m.description ?? "").slice(0, 200) }));
 
+  const kinds = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const images: StructureImage[] = (Array.isArray(body.images) ? body.images : [])
+    .filter((i) => i && kinds.includes(i.mediaType) && typeof i.data === "string" && /^[A-Za-z0-9+/=]+$/.test(i.data) && i.data.length <= MAX_IMAGE_B64)
+    .slice(0, MAX_IMAGES);
+
   const client = new Anthropic({ maxRetries: 1, timeout: 45_000 });
   const params = {
     model: MODEL,
     max_tokens: 4096,
-    system: buildSystemPrompt({ text, modules, severityDefinitions: body.severityDefinitions }),
-    messages: [{ role: "user" as const, content: buildUserMessage(text) }],
-    // Extraction is routine, so keep thinking light for speed.
-    output_config: { effort: "low" as const, format: { type: "json_schema" as const, schema: OUTPUT_SCHEMA as unknown as Record<string, unknown> } },
+    system: buildSystemPrompt({ text, modules, severityDefinitions: body.severityDefinitions, images }),
+    messages: [{ role: "user" as const, content: buildUserContent(text, images) }],
+    // A short think keeps replies quick while still writing a careful report.
+    output_config: { effort: "medium" as const, format: { type: "json_schema" as const, schema: OUTPUT_SCHEMA as unknown as Record<string, unknown> } },
   };
 
   try {
