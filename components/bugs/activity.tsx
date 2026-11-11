@@ -1,5 +1,5 @@
 "use client";
-import { Archive, ArrowRightLeft, FilePlus2, MessageSquare, Pencil, UserRound, Flag } from "lucide-react";
+import { Archive, ArrowRightLeft, BadgeCheck, FilePlus2, MessageSquare, Pencil, UserRound, Flag } from "lucide-react";
 import { useRef, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const ICON: Record<ActivityItem["type"], typeof Flag> = {
   edit: Pencil,
   attachment: FilePlus2,
   archive: Archive,
+  verified: BadgeCheck,
 };
 
 export function ActivityLog({ bug, composerRef }: { bug: Bug; composerRef?: React.RefObject<HTMLTextAreaElement | null> }) {
@@ -85,7 +86,7 @@ export function ActivityLog({ bug, composerRef }: { bug: Bug; composerRef?: Reac
                     <StatusBadge status={a.to as Status} className="text-xs" />
                   </div>
                 ) : null}
-                {a.type === "status" && a.text ? <p className="mt-2 whitespace-pre-wrap border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed text-ink-2">{a.text}</p> : null}
+                {(a.type === "status" || a.type === "verified") && a.text ? <p className="mt-2 whitespace-pre-wrap border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed text-ink-2">{a.text}</p> : null}
               </div>
             </li>
           );

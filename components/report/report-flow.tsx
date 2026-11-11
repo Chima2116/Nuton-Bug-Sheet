@@ -70,7 +70,7 @@ export function ReportFlow() {
   const draftParam = params.get("draft");
   useEffect(() => {
     if (!draftParam) return;
-    const d = drafts.find((x) => x.id === draftParam);
+    const d = drafts.find((x) => x.id === draftParam && x.kind !== "form");
     if (d && d.id !== draftId) {
       setDraftId(d.id);
       setCreatedAt(d.createdAt);
@@ -156,7 +156,7 @@ export function ReportFlow() {
     if (!res.ok) return;
     setDirty(false);
     setSavedAt(new Date().toISOString());
-    toast("Draft saved", { action: { label: "All drafts", href: "/report#drafts" } });
+    toast("Draft saved", { action: { label: "All drafts", href: "/report/notes#drafts" } });
   };
 
   const onConfirm = async () => {
@@ -272,18 +272,18 @@ export function ReportFlow() {
               </Button>
             </div>
 
-            {drafts.length ? (
+            {drafts.filter((d) => d.kind !== "form").length ? (
               <section id="drafts" className="mt-14 scroll-mt-6">
                 <h2 className="text-sm font-semibold text-ink">Drafts</h2>
                 <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-                  {drafts.map((d) => (
+                  {drafts.filter((d) => d.kind !== "form").map((d) => (
                     <li key={d.id} className="flex items-center gap-3 px-4 py-3">
                       <FileText className="size-4 shrink-0 text-muted" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13.5px] font-medium text-ink">{d.bugs[0]?.title || d.original.slice(0, 80) || "Untitled draft"}</p>
                         <p className="text-xs text-muted">{plural(d.bugs.length, "bug")} · saved {timeAgo(d.updatedAt)}</p>
                       </div>
-                      <Link href={`/report?draft=${d.id}`} className="rounded-md px-2.5 py-1 text-[13px] font-medium text-olive-700 hover:bg-olive-50">Continue</Link>
+                      <Link href={`/report/notes?draft=${d.id}`} className="rounded-md px-2.5 py-1 text-[13px] font-medium text-olive-700 hover:bg-olive-50">Continue</Link>
                       <button onClick={async () => { if ((await deleteDraft(d.id)).ok) { d.attachments.forEach((a) => void deleteAttachment(a)); toast("Draft deleted", { tone: "info" }); } }} className="rounded-md p-1.5 text-faint hover:bg-wash hover:text-st-reopened" aria-label="Delete draft"><Trash2 className="size-4" /></button>
                     </li>
                   ))}

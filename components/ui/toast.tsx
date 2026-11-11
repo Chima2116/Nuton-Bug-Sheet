@@ -8,7 +8,7 @@ interface Toast {
   id: number;
   message: string;
   tone: "success" | "info" | "error";
-  action?: { label: string; href: string };
+  action?: { label: string; href?: string; onClick?: () => void };
 }
 
 const Ctx = createContext<{ toast: (message: string, opts?: { tone?: Toast["tone"]; action?: Toast["action"] }) => void }>({ toast: () => {} });
@@ -34,10 +34,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} className="pointer-events-auto flex max-w-[460px] animate-toast-in items-center gap-2.5 rounded-lg bg-ink py-2.5 pl-3.5 pr-2.5 text-[13px] text-white shadow-[var(--shadow-pop)]">
             {t.tone === "success" ? <CheckCircle2 className="size-4 shrink-0 text-olive-300" /> : t.tone === "error" ? <AlertCircle className="size-4 shrink-0 text-[#f2a39a]" /> : <Info className="size-4 shrink-0 text-white/70" />}
             <span className="min-w-0 flex-1">{t.message}</span>
-            {t.action ? (
+            {t.action?.href ? (
               <Link href={t.action.href} onClick={() => dismiss(t.id)} className="rounded px-1.5 py-0.5 font-medium text-olive-300 hover:bg-white/10">
                 {t.action.label}
               </Link>
+            ) : t.action?.onClick ? (
+              <button
+                onClick={() => {
+                  t.action?.onClick?.();
+                  dismiss(t.id);
+                }}
+                className="rounded px-1.5 py-0.5 font-medium text-olive-300 hover:bg-white/10"
+              >
+                {t.action.label}
+              </button>
             ) : null}
             <button onClick={() => dismiss(t.id)} className={cn("rounded p-1 text-white/60 hover:bg-white/10 hover:text-white")} aria-label="Dismiss">
               <X className="size-3.5" />

@@ -1,14 +1,16 @@
+import { BadgeCheck } from "lucide-react";
 import { PRIORITY_HINTS, SEVERITY_META, STATUS_META } from "@/lib/constants";
 import type { Priority, Severity, Status } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Status: dot + label. `pill` adds a soft tint, used in detail headers. */
-export function StatusBadge({ status, pill, className }: { status: Status; pill?: boolean; className?: string }) {
-  const m = STATUS_META[status];
+export function StatusBadge({ status, verified, pill, className }: { status: Status; verified?: boolean; pill?: boolean; className?: string }) {
+  const m = STATUS_META[status] ?? STATUS_META.Open;
   return (
     <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium", m.text, pill && cn("rounded-full px-2.5 py-0.5", m.tint), className)}>
       <span className={cn("size-1.5 rounded-full", m.dot)} />
       {status}
+      {verified && status === "Resolved" ? <BadgeCheck className="size-3.5" aria-label="Verified" /> : null}
     </span>
   );
 }

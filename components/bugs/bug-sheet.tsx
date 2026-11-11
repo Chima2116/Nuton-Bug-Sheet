@@ -1,5 +1,5 @@
 "use client";
-import { Archive, ArchiveRestore, Plus, ChevronLeft, ChevronRight, Columns3, Download, Search, UserRound, X, ListChecks } from "lucide-react";
+import { BadgeCheck, Plus, ChevronLeft, ChevronRight, Columns3, Download, Search, UserRound, X, ListChecks } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -10,10 +10,9 @@ import { useToast } from "@/components/ui/toast";
 import { SEGMENTS, SEVERITY_META, STATUS_META, type SegmentId } from "@/lib/constants";
 import { useAssignable, useMe, useModuleMap, useModules, usePerms, useUserMap } from "@/lib/hooks";
 import { segmentMatches } from "@/lib/queries";
-import { assignBug, changeStatus, setArchived } from "@/lib/store";
+import { assignBug, changeStatus, verifyBug } from "@/lib/store";
 import { SEVERITIES, STATUSES, type Bug, type Severity, type Status } from "@/lib/types";
 import { csvCell, downloadText, formatDate, plural } from "@/lib/utils";
-import { availableTransitions } from "@/lib/workflow";
 import { BugTable, COLUMNS, type ColumnId } from "./bug-table";
 import { DateFilter, FilterMenu } from "./filter-menu";
 import { EMPTY_FILTERS, activeFilterCount, applyFilters, sortBugs, type Filters, type Sort, type SortKey } from "./filters";
@@ -23,12 +22,10 @@ const DEFAULT_COLS: ColumnId[] = COLUMNS.map((c) => c.id);
 
 export function BugSheet({
   bugs,
-  mode = "all",
   emptyTitle = "No bugs yet",
   emptyBody,
 }: {
   bugs: Bug[];
-  mode?: "all" | "verified" | "archived";
   emptyTitle?: string;
   emptyBody?: string;
 }) {
@@ -121,30 +118,23 @@ export function BugSheet({
   };
 
   const bulkStatus = async (to: Status) => {
-    let ok = 0;
-    for (const b of selectedBugs) {
-      const t = availableTransitions(b.status, permissions).find((x) => x.to === to);
-      if (t && (!t.needs || t.needs === "note") && (await changeStatus(b.id, to)).ok) ok++;
-    }
-    const skipped = selectedBugs.length - ok;
-    toast(ok ? `${plural(ok, "bug")} moved to ${to}${skipped ? ` · ${skipped} skipped` : ""}` : `None of the selected bugs can move to ${to} from here`, { tone: ok ? "success" : "error" });
-    if (ok) setSelected(new Set());
+    const targets = selectedBugs.filter((b) => b.status !== to);
+    for (const b of targets) await changeStatus(b.id, to);
+    toast(targets.length ? (to === "Resolved" ? `${plural(targets.length, "bug")} marked as resolved.` : to === "Reopened" ? `${plural(targets.length, "bug")} reopened.` : "Status updated.") : "Status updated.");
+    setSelected(new Set());
+  };
+  const bulkVerify = async () => {
+    for (const b of selectedBugs) await verifyBug(b.id);
+    toast(`${plural(selectedBugs.length, "bug")} verified.`);
+    setSelected(new Set());
   };
   const bulkAssign = async (id: string | null, name?: string) => {
     for (const b of selectedBugs) await assignBug(b.id, id);
-    toast(id ? `${plural(selectedBugs.length, "bug")} assigned to ${name}` : `${plural(selectedBugs.length, "bug")} unassigned`);
-    setSelected(new Set());
-  };
-  const bulkArchive = async (archive: boolean) => {
-    const eligible = archive ? selectedBugs.filter((b) => b.status === "Verified" || b.status === "Closed") : selectedBugs;
-    if (!eligible.length) return toast("Only Verified or Closed bugs can be archived", { tone: "error" });
-    const res = await setArchived(eligible.map((b) => b.id), archive);
-    if (!res.ok) return;
-    toast(`${plural(eligible.length, "bug")} ${archive ? "archived" : "restored"}${eligible.length < selectedBugs.length ? ` · ${selectedBugs.length - eligible.length} skipped` : ""}`);
+    toast(id ? `Assigned to ${name}.` : "Bugs unassigned.");
     setSelected(new Set());
   };
 
-  const showSegments = mode === "all";
+  const showSegments = true;
   const statusOptions = STATUSES.map((s) => ({ value: s, label: s, dot: STATUS_META[s].dot }));
 
   return (
@@ -167,7 +157,7 @@ export function BugSheet({
             </button>
           ) : null}
         </div>
-        {mode !== "verified" ? <FilterMenu label="Status" options={statusOptions} selected={filters.status} onChange={(v) => patch({ status: v as Status[], segment: v.length ? "all" : filters.segment })} /> : null}
+        <FilterMenu label="Status" options={statusOptions} selected={filters.status} onChange={(v) => patch({ status: v as Status[], segment: v.length ? "all" : filters.segment })} />
         <FilterMenu label="Severity" options={SEVERITIES.map((s) => ({ value: s, label: s, dot: SEVERITY_META[s].dot }))} selected={filters.severity} onChange={(v) => patch({ severity: v as Severity[] })} />
         <FilterMenu label="Module" options={modules.map((m) => ({ value: m.id, label: m.name }))} selected={filters.module} onChange={(v) => patch({ module: v })} width="w-[240px]" />
         <FilterMenu
@@ -210,7 +200,7 @@ export function BugSheet({
       {selected.size > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-olive-200 bg-olive-50 px-3 py-2">
           <span className="mr-1 text-[13px] font-medium text-olive-800">{selected.size} selected</span>
-          {can("assign") && mode !== "archived" ? (
+          {can("assign") ? (
             <Menu>
               <MenuTrigger asChild>
                 <Button size="sm"><UserRound className="size-3.5" /> Assign</Button>
@@ -225,8 +215,7 @@ export function BugSheet({
               </MenuContent>
             </Menu>
           ) : null}
-          {mode !== "archived" ? (
-            <Menu>
+          <Menu>
               <MenuTrigger asChild>
                 <Button size="sm"><ListChecks className="size-3.5" /> Set status</Button>
               </MenuTrigger>
@@ -238,16 +227,9 @@ export function BugSheet({
                   </MenuItem>
                 ))}
                 <MenuSeparator />
-                <p className="px-2.5 py-1.5 text-xs text-muted">Moves that need a fix description or a comment are skipped. Open those bugs individually.</p>
+                <MenuItem icon={<BadgeCheck className="size-4" />} onSelect={() => void bulkVerify()}>Mark as verified</MenuItem>
               </MenuContent>
-            </Menu>
-          ) : null}
-          {can("archive") ? (
-            <Button size="sm" onClick={() => void bulkArchive(mode !== "archived")}>
-              {mode === "archived" ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
-              {mode === "archived" ? "Restore" : "Archive"}
-            </Button>
-          ) : null}
+          </Menu>
           <Button size="sm" onClick={() => exportCsv(selectedBugs)}><Download className="size-3.5" /> Export</Button>
           <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSelected(new Set())}>Clear selection</Button>
         </div>
@@ -268,7 +250,7 @@ export function BugSheet({
               icon={<Search className="size-4" />}
               title={anyFilter ? "No bugs match these filters" : emptyTitle}
               body={anyFilter ? "Try removing a filter or searching for something else." : emptyBody}
-              action={anyFilter ? <Button onClick={() => { setFilters(EMPTY_FILTERS); setPage(1); }}>Clear filters</Button> : mode === "all" && can("report") ? <ButtonLink href="/report" variant="primary"><Plus className="size-4" strokeWidth={2.25} /> Report your first bug</ButtonLink> : undefined}
+              action={anyFilter ? <Button onClick={() => { setFilters(EMPTY_FILTERS); setPage(1); }}>Clear filters</Button> : can("report") ? <ButtonLink href="/report" variant="primary"><Plus className="size-4" strokeWidth={2.25} /> Report your first bug</ButtonLink> : undefined}
             />
           }
         />

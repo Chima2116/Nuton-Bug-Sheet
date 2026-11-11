@@ -7,7 +7,7 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS and Supabase (Auth, Po
 ## Set up
 
 1. **Create a Supabase project** at supabase.com.
-2. **Run the database setup.** Open `supabase/migrations/0001_init.sql`, edit the two `team_members` lines at the top (your email and David's), then paste the whole file into the Supabase **SQL Editor** and run it.
+2. **Run the database setup.** Open `supabase/migrations/0001_init.sql`, edit the two `team_members` lines at the top (your email and David's), then paste the whole file into the Supabase **SQL Editor** and run it. Then run `supabase/migrations/0002_simplify_statuses.sql` and `supabase/migrations/0003_capture_attachments.sql` the same way, in that order. Both are safe on a database that already has bugs.
 3. **Create the two accounts.** *Authentication → Users → Add user*: add each of you with the same emails you used above, a password, and *Auto confirm* ticked. Then in *Authentication → Sign In / Providers* turn **off** "Allow new users to sign up". (Even if left on, the database refuses any email that isn't in `team_members`.)
 4. **Add your keys.** Copy `.env.local.example` to `.env.local` and fill in the project URL and anon (publishable) key from *Project Settings → API*.
 5. **Run it.**
@@ -19,25 +19,30 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS and Supabase (Auth, Po
 
 Until the keys are present the app shows a setup screen instead of the login.
 
-## Who can do what
+## How it works
 
-| | Product Designer | Developer |
-| --- | --- | --- |
-| Report, edit and assign bugs | ✓ | ✓ |
-| Start work, record a fix, submit for testing | | ✓ |
-| Verify, reopen, close, archive | ✓ | |
-| Comment, attach files | ✓ | ✓ |
-| Manage modules and definitions | ✓ | ✓ |
-
-The workflow is enforced **in the database**, not just the UI: `change_bug_status()` in the migration checks the caller's role and the allowed transition, so a developer can't verify their own fix even by calling the API directly. Open → In Progress → Ready for Testing → Verified / Reopened → Closed.
+- **Statuses:** Open, In Progress, Ready for Testing, Resolved, Reopened. Everything lives in **All Bugs**, so resolved bugs stay as a full history. Use the tabs and filters to narrow the list.
+- **No friction:** Starting work, resolving, reopening, verifying, changing status and assigning all happen immediately, with no confirmation and no required reason. A toast confirms each change and offers **Undo**. You can leave a comment on a bug any time, but nothing asks for one.
+- **Verified** is a small optional mark (a check next to *Resolved*), not a status or a separate page.
+- Both of you can report, edit, assign and change the status of any bug. The two accounts are listed in `team_members`.
 
 ## Security model
 
 - Row Level Security is on for every table. Only signed-in team members can read or write.
 - `team_members` is not readable from the browser. A trigger on `auth.users` rejects any email not listed in it.
 - Roles live in `profiles.role` and can't be changed by the client. Reporter, bug ID and created date are immutable.
+- Status changes go through `change_bug_status()` / `verify_bug()` so the history is always written by the database.
 - Screenshots and recordings go to a **private** `attachments` bucket (50 MB per file) and are shown via short-lived signed URLs. Originals are never resized or re-encoded.
 - Status, assignment and archive entries in the activity log are written by the database. The browser can only add comments, edits and attachment notes, and only as itself.
+
+## Capture from Nuton
+
+On **Report a Bug**, *Capture from Nuton* opens nuton.app in its own window. You draw on the problem, press **Add to bug**, and the screenshot (the untouched original plus the annotated version, with page, browser and screen details) lands on your draft in the Bug Sheet. The Bug Sheet side is built. The capture module that runs inside Nuton is a separate piece of work in the Nuton codebase.
+
+- Protocol and security rules: `docs/nuton-capture-protocol.md`.
+- The address Nuton is opened at is `NEXT_PUBLIC_NUTON_ORIGIN` (default `https://nuton.app`).
+- Nuton must trust the Bug Sheet's own address. Until the Bug Sheet is deployed that is `http://localhost:3000`.
+- The old text-first form is still available at `/report/notes` for reporting several issues at once.
 
 ## Notes
 
@@ -48,12 +53,13 @@ The workflow is enforced **in the database**, not just the UI: `change_bug_statu
 ## Structure
 
 ```
-app/                 routes: /login, /reset-password, /, /bugs, /bugs/[id], /report, /my-tasks, /verified, /archived, /settings
+app/                 routes: /login, /reset-password, /, /bugs, /bugs/[id], /report, /report/notes, /my-tasks, /settings
 components/          ui, layout, bugs, report, settings
 lib/store.ts         all reads and writes to Supabase (one place to change)
 lib/auth.tsx         session handling
 lib/blobs.ts         Storage uploads and signed URLs
-lib/workflow.ts      status rules (mirrored in the SQL function)
+lib/workflow.ts      quick actions and toast copy
 lib/extract.ts       mock structuring
+lib/capture.ts       handoff with the capture window in Nuton
 supabase/migrations  schema, security, workflow function
 ```

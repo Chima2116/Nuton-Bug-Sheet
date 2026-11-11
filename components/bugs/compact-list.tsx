@@ -28,7 +28,7 @@ export function CompactList({ bugs, showStatus = true, showAssignee }: { bugs: B
               </div>
               {showAssignee && u ? <Avatar name={u.name} id={u.id} size={22} /> : null}
               <PriorityBadge priority={b.priority} className="hidden sm:inline-flex" />
-              {showStatus ? <StatusBadge status={b.status} className="hidden w-[138px] justify-start text-xs md:inline-flex" /> : null}
+              {showStatus ? <StatusBadge status={b.status} verified={!!b.verifiedAt} className="hidden w-[138px] justify-start text-xs md:inline-flex" /> : null}
             </Link>
           </li>
         );

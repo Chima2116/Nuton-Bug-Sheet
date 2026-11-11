@@ -1,20 +1,17 @@
 "use client";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeCheck, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { PriorityBadge, SeverityBadge, StatusBadge } from "@/components/ui/badges";
 import { Checkbox } from "@/components/ui/controls";
-import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from "@/components/ui/overlay";
-import { useToast } from "@/components/ui/toast";
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "@/components/ui/overlay";
 import { useModuleMap, usePerms, useUserMap } from "@/lib/hooks";
-import { changeStatus } from "@/lib/store";
-import type { Bug } from "@/lib/types";
+import { STATUSES, type Bug } from "@/lib/types";
+import { useBugActions } from "./use-bug-actions";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
-import { availableTransitions, type Transition } from "@/lib/workflow";
 import { AssigneeMenu } from "./assignee-menu";
 import type { Sort, SortKey } from "./filters";
-import { StatusDialog } from "./status-dialog";
 
 export type ColumnId = "id" | "title" | "module" | "severity" | "priority" | "status" | "assignee" | "reporter" | "reportedAt" | "updatedAt";
 
@@ -63,9 +60,8 @@ export function BugTable({
   const router = useRouter();
   const users = useUserMap();
   const modules = useModuleMap();
-  const { permissions, can } = usePerms();
-  const { toast } = useToast();
-  const [pending, setPending] = useState<{ bug: Bug; transition: Transition } | null>(null);
+  const { can } = usePerms();
+  const { setStatus, verify } = useBugActions();
   const cols = COLUMNS.filter((c) => visible.includes(c.id));
   const fixedWidth = cols.reduce((n, c) => n + c.width, 0) + (selectable ? CHECK_W : 0);
   const idLeft = selectable ? CHECK_W : 0;
@@ -80,13 +76,6 @@ export function BugTable({
   const stickStyle = (id: ColumnId | "check") => (id === "id" ? { left: idLeft } : id === "title" ? { left: titleLeft } : undefined);
   const allSelected = !!selected && bugs.length > 0 && bugs.every((b) => selected.has(b.id));
   const someSelected = !!selected && bugs.some((b) => selected.has(b.id));
-
-  const runTransition = async (bug: Bug, t: Transition) => {
-    if (t.needs) return setPending({ bug, transition: t });
-    const res = await changeStatus(bug.id, t.to);
-    if (res.ok) toast(`${bug.id} moved to ${t.to}`);
-    else toast(res.error, { tone: "error" });
-  };
 
   const render = (b: Bug, id: ColumnId) => {
     switch (id) {
@@ -105,25 +94,29 @@ export function BugTable({
       case "priority":
         return <PriorityBadge priority={b.priority} />;
       case "status": {
-        const trs = availableTransitions(b.status, permissions);
-        if (!trs.length) return <StatusBadge status={b.status} />;
+        const inner = <StatusBadge status={b.status} verified={!!b.verifiedAt} />;
+        if (!can("progress") && !can("verify")) return inner;
         return (
           <Menu>
             <MenuTrigger asChild>
               <button onClick={(e) => e.stopPropagation()} className="group -mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 hover:bg-wash-2 data-[state=open]:bg-wash-2" aria-label={`Change status of ${b.id}`}>
-                <StatusBadge status={b.status} />
+                {inner}
                 <ChevronDown className="size-3 text-faint opacity-0 group-hover:opacity-100 group-data-[state=open]:opacity-100" />
               </button>
             </MenuTrigger>
-            <MenuContent align="start" className="w-[220px]" onClick={(e) => e.stopPropagation()}>
-              <MenuLabel>Move to</MenuLabel>
-              {trs.map((t) => (
-                <MenuItem key={t.to} onSelect={() => void runTransition(b, t)}>
-                  <span className="flex items-center justify-between gap-3">
-                    <StatusBadge status={t.to} className="text-[13px]" />
-                  </span>
+            <MenuContent align="start" className="w-[212px]" onClick={(e) => e.stopPropagation()}>
+              <MenuLabel>Status</MenuLabel>
+              {STATUSES.map((st) => (
+                <MenuItem key={st} selected={b.status === st} onSelect={() => void setStatus(b, st)}>
+                  <StatusBadge status={st} className="text-[13px]" />
                 </MenuItem>
               ))}
+              {(b.status === "Ready for Testing" || (b.status === "Resolved" && !b.verifiedAt)) && (
+                <>
+                  <MenuSeparator />
+                  <MenuItem icon={<BadgeCheck className="size-4" />} onSelect={() => void verify(b)}>Mark as verified</MenuItem>
+                </>
+              )}
             </MenuContent>
           </Menu>
         );
@@ -229,7 +222,6 @@ export function BugTable({
         </tbody>
       </table>
       {bugs.length === 0 ? emptyState : null}
-      {pending ? <StatusDialog bug={pending.bug} transition={pending.transition} onClose={() => setPending(null)} /> : null}
     </div>
   );
 }

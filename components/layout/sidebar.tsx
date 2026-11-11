@@ -1,5 +1,5 @@
 "use client";
-import { Archive, BadgeCheck, Bug, ChevronsUpDown, LayoutGrid, ListTodo, Settings } from "lucide-react";
+import { Bug, ChevronsUpDown, LayoutGrid, ListTodo, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
@@ -39,15 +39,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const bugs = useActiveBugs();
   const me = useMe();
   const { role } = usePerms();
-  const perms = usePerms();
-  const tasks = useMemo(() => (me ? myTasks(bugs, me.id, perms.permissions).length : 0), [bugs, me, perms.permissions]);
+  const tasks = useMemo(() => (me ? myTasks(bugs, me.id).length : 0), [bugs, me]);
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
   const items = [
     { href: "/", icon: LayoutGrid, label: "Overview" },
     { href: "/bugs", icon: Bug, label: "All Bugs", count: bugs.length },
     { href: "/my-tasks", icon: ListTodo, label: "My Tasks", count: tasks },
-    { href: "/verified", icon: BadgeCheck, label: "Verified" },
-    { href: "/archived", icon: Archive, label: "Archived" },
   ];
   return (
     <div className="flex h-full flex-col px-3 pb-3 pt-3.5">

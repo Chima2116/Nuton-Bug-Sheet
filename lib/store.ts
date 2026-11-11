@@ -5,7 +5,6 @@ import { bugIdFromSeq } from "./utils";
 import { defaultDefinitions, EMPTY_STATE, ROLES, type AppState, type Definitions } from "./state";
 import { supabase } from "./supabase";
 import type { ActivityItem, AppModule, Attachment, Bug, Draft, Permission, Priority, Severity, Status, User } from "./types";
-import { availableTransitions } from "./workflow";
 
 /* ------------------------------------------------------------------ store */
 let state: AppState = EMPTY_STATE;
@@ -59,10 +58,15 @@ const OK: Result = { ok: true };
 /* ------------------------------------------------------------------ mapping */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function toAttachment(r: any): Attachment {
-  return { id: r.id, name: r.name, kind: r.kind, mime: r.mime, size: Number(r.size), path: r.path, addedAt: r.created_at, addedById: r.uploaded_by };
+  return { id: r.id, name: r.name, kind: r.kind, mime: r.mime, size: Number(r.size), path: r.path, variant: r.variant ?? "upload", sourceId: r.source_id ?? undefined, meta: r.meta ?? undefined, addedAt: r.created_at, addedById: r.uploaded_by };
 }
 function toActivity(r: any): ActivityItem {
-  return { id: r.id, type: r.type, actorId: r.actor_id, at: r.created_at, text: r.text ?? undefined, from: r.from_value, to: r.to_value };
+  const legacy = (v: string | null) => (v === "Verified" || v === "Closed" ? "Resolved" : v);
+  return { id: r.id, type: r.type, actorId: r.actor_id, at: r.created_at, text: r.text ?? undefined, from: r.type === "status" ? legacy(r.from_value) : r.from_value, to: r.type === "status" ? legacy(r.to_value) : r.to_value };
+}
+/** Until migration 0002 has run, the database may still hold the old statuses. Show them as Resolved. */
+function normalizeStatus(s: string): Status {
+  return s === "Verified" || s === "Closed" ? "Resolved" : (s as Status);
 }
 function toBug(r: any): Bug {
   return {
@@ -83,12 +87,14 @@ function toBug(r: any): Bug {
     reporterId: r.reporter_id,
     reportedAt: r.created_at,
     updatedAt: r.updated_at,
-    status: r.status,
+    status: normalizeStatus(r.status),
     assigneeId: r.assignee_id,
     devNotes: r.dev_notes,
     fixDescription: r.fix_description,
     fixedAt: r.fixed_at ?? undefined,
     resolvedAt: r.resolved_at ?? undefined,
+    verifiedAt: r.verified_at ?? undefined,
+    verifiedById: r.verified_by ?? undefined,
     archived: r.archived,
     originalReport: r.original_report,
     activity: (r.bug_activity ?? []).map(toActivity).sort((a: ActivityItem, b: ActivityItem) => +new Date(a.at) - +new Date(b.at)),
@@ -210,7 +216,7 @@ export async function createBugs(inputs: NewBugInput[]): Promise<string[] | null
   if (!supabase) return null;
   const rows = inputs.map((i) => ({
     title: i.title, description: i.description, steps: i.steps, expected: i.expected, actual: i.actual,
-    severity: i.severity, priority: i.priority, category: i.category, module_id: i.moduleId, environment: i.environment,
+    severity: i.severity, priority: i.priority, category: i.category, module_id: i.moduleId || null, environment: i.environment,
     reporter_id: state.currentUserId, original_report: i.originalReport,
   }));
   const { data, error } = await supabase.from("bugs").insert(rows).select("id, seq");
@@ -253,22 +259,40 @@ export async function updateBugFields(id: string, patch: Partial<Bug>, summary?:
 }
 export const saveDevFields = (id: string, patch: Pick<Partial<Bug>, "devNotes" | "fixDescription">, summary: string) => updateBugFields(id, patch, summary);
 
-export async function changeStatus(id: string, to: Status, opts: { note?: string; fix?: string } = {}): Promise<Result> {
+/** Changes a bug's status immediately. A note is optional. */
+export async function changeStatus(id: string, to: Status, opts: { note?: string } = {}): Promise<Result> {
   const bug = state.bugs.find((b) => b.id === id);
-  if (!supabase || !bug) return fail({ message: "Bug not found." }, true);
-  const tr = availableTransitions(bug.status, permissionsOf(state)).find((t) => t.to === to);
-  if (!tr) return fail({ message: "You can't move this bug to that status." }, true);
-  if (tr.needs === "fix" && !(opts.fix ?? bug.fixDescription).trim()) return fail({ message: "Describe the fix before submitting for testing." }, true);
-  if (tr.needs === "comment" && !opts.note?.trim()) return fail({ message: "Add a comment explaining why." }, true);
-  const { error } = await supabase.rpc("change_bug_status", { p_bug: bug.uuid, p_to: to, p_note: opts.note?.trim() || null, p_fix: opts.fix?.trim() || null });
-  if (error) return fail(error, true);
+  if (!supabase || !bug) return fail({ message: "Bug not found." });
+  if (bug.status === to) return OK;
+  // Show the change straight away; the database is the source of truth and we re-sync right after.
+  patchLocal(id, { status: to, resolvedAt: to === "Resolved" ? new Date().toISOString() : undefined, verifiedAt: to === "Resolved" ? bug.verifiedAt : undefined, verifiedById: to === "Resolved" ? bug.verifiedById : undefined });
+  const { error } = await supabase.rpc("change_bug_status", { p_bug: bug.uuid, p_to: to, p_note: opts.note?.trim() || null });
+  if (error) {
+    await loadAll();
+    return fail(error);
+  }
   await loadAll();
   return OK;
+}
+
+/** Marks the fix as verified (and resolves the bug if it isn't already). */
+export async function verifyBug(id: string, opts: { note?: string } = {}): Promise<Result> {
+  const bug = state.bugs.find((b) => b.id === id);
+  if (!supabase || !bug) return fail({ message: "Bug not found." });
+  patchLocal(id, { status: "Resolved", verifiedAt: new Date().toISOString(), verifiedById: state.currentUserId });
+  const { error } = await supabase.rpc("verify_bug", { p_bug: bug.uuid, p_note: opts.note?.trim() || null });
+  await loadAll();
+  return error ? fail(error) : OK;
+}
+
+function patchLocal(id: string, patch: Partial<Bug>) {
+  set((s) => ({ ...s, bugs: s.bugs.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
 }
 
 export async function assignBug(id: string, userId: string | null): Promise<Result> {
   const uuid = uuidOf(id);
   if (!supabase || !uuid) return fail({ message: "Bug not found." });
+  patchLocal(id, { assigneeId: userId });
   return commit(supabase.from("bugs").update({ assignee_id: userId }).eq("id", uuid));
 }
 
@@ -286,21 +310,35 @@ export async function addAttachments(id: string, atts: Attachment[]): Promise<Re
   return commit(supabase.from("bug_activity").insert({ bug_id: uuid, type: "attachment", actor_id: state.currentUserId, text: atts.length === 1 ? `Added ${atts[0].name}` : `Added ${atts.length} attachments` }));
 }
 
-export async function setArchived(ids: string[], archived: boolean): Promise<Result> {
-  const uuids = ids.map(uuidOf).filter(Boolean) as string[];
-  if (!supabase || !uuids.length) return OK;
-  return commit(supabase.from("bugs").update({ archived }).in("id", uuids));
-}
-
 /* ------------------------------------------------------------------ drafts */
-export async function saveDraft(draft: Draft): Promise<Result> {
+export async function saveDraft(draft: Draft, opts: { quiet?: boolean } = {}): Promise<Result> {
   if (!supabase) return fail({ message: "Not connected." });
   const { id, createdAt: _c, updatedAt: _u, ...data } = draft; // eslint-disable-line @typescript-eslint/no-unused-vars
-  return commit(supabase.from("drafts").upsert({ id, owner_id: state.currentUserId, data, updated_at: new Date().toISOString() }));
+  const now = new Date().toISOString();
+  const op = supabase.from("drafts").upsert({ id, owner_id: state.currentUserId, data, updated_at: now });
+  if (!opts.quiet) return commit(op);
+  // Autosave: write through and update the local list without re-reading everything.
+  const { error } = await op;
+  if (error) return fail(error, true);
+  set((s) => {
+    const next: Draft = { ...draft, updatedAt: now, createdAt: draft.createdAt || now };
+    return { ...s, drafts: s.drafts.some((d) => d.id === id) ? s.drafts.map((d) => (d.id === id ? next : d)) : [next, ...s.drafts] };
+  });
+  return OK;
 }
 export async function deleteDraft(id: string): Promise<Result> {
   if (!supabase) return OK;
   return commit(supabase.from("drafts").delete().eq("id", id), true);
+}
+
+/** Drafts nobody touched for two weeks are removed so abandoned captures don't pile up. */
+export async function pruneOldDrafts(days = 14) {
+  if (!supabase) return;
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  const stale = state.drafts.filter((d) => d.updatedAt < cutoff);
+  if (!stale.length) return;
+  await supabase.from("drafts").delete().in("id", stale.map((d) => d.id));
+  set((s) => ({ ...s, drafts: s.drafts.filter((d) => d.updatedAt >= cutoff) }));
 }
 
 /* ------------------------------------------------------------------ team & settings */

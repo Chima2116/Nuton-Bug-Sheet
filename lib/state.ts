@@ -30,14 +30,14 @@ export const ROLES: Role[] = [
   {
     id: "designer",
     name: "Product Designer",
-    description: "Reports and tests bugs, then verifies or reopens fixes.",
-    permissions: ["report", "edit", "assign", "verify", "archive", "manage"],
+    description: "Reports and tests bugs.",
+    permissions: ["report", "edit", "assign", "progress", "verify", "archive", "manage"],
   },
   {
     id: "developer",
     name: "Developer",
-    description: "Fixes bugs and submits them for testing. Can also report, edit and assign bugs.",
-    permissions: ["report", "edit", "assign", "progress", "manage"],
+    description: "Fixes bugs.",
+    permissions: ["report", "edit", "assign", "progress", "verify", "archive", "manage"],
   },
 ];
 

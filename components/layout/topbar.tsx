@@ -19,13 +19,9 @@ function crumbs(pathname: string): { label: string; href?: string }[] {
     case "bugs":
       return b ? [{ label: "All Bugs", href: "/bugs" }, { label: decodeURIComponent(b).toUpperCase() }] : [{ label: "All Bugs" }];
     case "report":
-      return [{ label: "All Bugs", href: "/bugs" }, { label: "Report a Bug" }];
+      return [{ label: "All Bugs", href: "/bugs" }, { label: b === "notes" ? "Report as notes" : "Report a Bug" }];
     case "my-tasks":
       return [{ label: "My Tasks" }];
-    case "verified":
-      return [{ label: "Verified" }];
-    case "archived":
-      return [{ label: "Archived" }];
     case "settings":
       return [{ label: "Settings" }];
     default:

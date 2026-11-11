@@ -21,7 +21,7 @@ export function SetupNeeded() {
           <p>Go to supabase.com, create a project, then open <b>Project Settings → API</b>.</p>
         </Step>
         <Step n={2} title="Set up the database">
-          <p>Open <b>SQL Editor</b>, paste <Code>supabase/migrations/0001_init.sql</Code>, and edit the two <Code>team_members</Code> lines at the top to your email and David&apos;s. Then run it.</p>
+          <p>Open <b>SQL Editor</b>, paste <Code>supabase/migrations/0001_init.sql</Code>, and edit the two <Code>team_members</Code> lines at the top to your email and David&apos;s. Run it, then run <Code>0002_simplify_statuses.sql</Code> the same way.</p>
         </Step>
         <Step n={3} title="Create your two accounts">
           <p>In <b>Authentication → Users → Add user</b>, add each of you with the same emails and a password (tick <i>Auto confirm</i>). Under <b>Authentication → Sign In / Providers</b>, turn off <i>Allow new users to sign up</i>.</p>

@@ -1,4 +1,4 @@
--- Nuton Bug sheet: schema, security rules and workflow enforcement.
+-- Nuton Bug sheet: schema, security rules and workflow enforcement. (Run 0002_simplify_statuses.sql after this one.)
 -- Run once in the Supabase SQL editor (or `supabase db push`).
 --
 -- STEP 1 - EDIT THE TWO LINES BELOW before running. Only these two emails can ever have an account.

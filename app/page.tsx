@@ -9,7 +9,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/controls";
 import { feedVerb } from "@/lib/activity";
 import { useActiveBugs, useMe, usePerms, useUserMap } from "@/lib/hooks";
-import { countsByStatus, myTaskGroups } from "@/lib/queries";
+import { countsByStatus, myTasks } from "@/lib/queries";
 import { timeAgo } from "@/lib/utils";
 
 function Metric({ label, value, note, href }: { label: string; value: number; note: string; href: string }) {
@@ -42,10 +42,10 @@ export default function OverviewPage() {
   const bugs = useActiveBugs();
   const me = useMe();
   const users = useUserMap();
-  const { permissions, can } = usePerms();
+  const { can } = usePerms();
   const counts = useMemo(() => countsByStatus(bugs), [bugs]);
-  const recent = useMemo(() => [...bugs].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)).slice(0, 6), [bugs]);
-  const groups = useMemo(() => (me ? myTaskGroups(bugs, me.id, permissions).filter((g) => g.actionable) : []), [bugs, me, permissions]);
+  const recent = useMemo(() => [...bugs].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)).slice(0, 8), [bugs]);
+  const mine = useMemo(() => (me ? myTasks(bugs, me.id) : []), [bugs, me]);
   const feed = useMemo(
     () =>
       bugs
@@ -54,10 +54,8 @@ export default function OverviewPage() {
         .slice(0, 8),
     [bugs],
   );
-  const urgent = bugs.filter((b) => (b.status === "Open" || b.status === "Reopened") && (b.severity === "Critical" || b.severity === "High")).length;
   const weekAgo = Date.now() - 7 * 86_400_000;
   const newThisWeek = bugs.filter((b) => +new Date(b.reportedAt) > weekAgo).length;
-  const unassigned = bugs.filter((b) => !b.assigneeId && b.status === "Open").length;
 
   return (
     <PageBody>
@@ -65,10 +63,10 @@ export default function OverviewPage() {
 
       <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Metric label="Total Bugs" value={counts.total} note={`${newThisWeek} reported this week`} href="/bugs" />
-        <Metric label="Open" value={counts.open} note={`${urgent} critical or high · ${unassigned} unassigned`} href="/bugs?segment=open" />
+        <Metric label="Open" value={counts.open} note={counts.reopened ? `Includes ${counts.reopened} reopened` : "Waiting to be picked up"} href="/bugs?segment=open" />
         <Metric label="In Progress" value={counts.progress} note="Being worked on" href="/bugs?segment=progress" />
-        <Metric label="Ready for Testing" value={counts.testing} note="Waiting for verification" href="/bugs?segment=testing" />
-        <Metric label="Resolved" value={counts.resolved} note="Verified or closed" href="/bugs?segment=resolved" />
+        <Metric label="Ready for Testing" value={counts.testing} note="Waiting to be checked" href="/bugs?segment=testing" />
+        <Metric label="Resolved" value={counts.resolved} note="Fixed and on record" href="/bugs?segment=resolved" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -86,13 +84,13 @@ export default function OverviewPage() {
         </Panel>
 
         <div className="space-y-6">
-          {groups.map((g) => (
-            <Panel key={g.id} title={g.label} href={g.id === "assigned" ? "/bugs?assignee=me" : g.id === "verify" ? "/bugs?segment=testing" : "/my-tasks"} hrefLabel={g.id === "assigned" ? "Open in sheet" : "View all"}>
-              {g.bugs.length ? <CompactList bugs={g.bugs.slice(0, 4)} showStatus={false} /> : <p className="px-4 py-8 text-center text-[13px] text-muted">{g.id === "verify" ? "Nothing is waiting for you to verify." : "Nothing assigned to you right now."}</p>}
-            </Panel>
-          ))}
+          <Panel title="Assigned to you" href="/my-tasks">
+            {mine.length ? <CompactList bugs={mine.slice(0, 4)} showStatus={false} /> : <p className="px-4 py-8 text-center text-[13px] text-muted">Nothing assigned to you right now.</p>}
+          </Panel>
           <Panel title="Activity">
-            {feed.length === 0 ? <p className="px-4 py-8 text-center text-[13px] text-muted">Updates from both of you will show up here.</p> : (
+            {feed.length === 0 ? (
+              <p className="px-4 py-8 text-center text-[13px] text-muted">Updates from both of you will show up here.</p>
+            ) : (
               <ul className="divide-y divide-line">
                 {feed.map(({ a, b }) => {
                   const actor = users.get(a.actorId);
@@ -102,7 +100,7 @@ export default function OverviewPage() {
                         <Avatar name={actor?.name ?? "?"} id={actor?.id} size={24} className="mt-0.5" />
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] leading-snug text-ink-2"><span className="font-medium text-ink">{actor?.name}</span> {feedVerb(a, b, users)}</p>
-                          {a.text && (a.type === "comment" || a.type === "status") ? <p className="mt-0.5 line-clamp-1 text-xs text-muted">{a.text}</p> : null}
+                          {a.text && (a.type === "comment" || a.type === "status" || a.type === "verified") ? <p className="mt-0.5 line-clamp-1 text-xs text-muted">{a.text}</p> : null}
                         </div>
                         <span className="shrink-0 pt-0.5 text-xs text-faint">{timeAgo(a.at)}</span>
                       </Link>

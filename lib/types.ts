@@ -7,7 +7,7 @@ export type Priority = (typeof PRIORITIES)[number];
 export const CATEGORIES = ["UI/Visual", "Functional", "Responsive", "Performance", "Data", "Accessibility"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
-export const STATUSES = ["Open", "In Progress", "Ready for Testing", "Verified", "Reopened", "Closed"] as const;
+export const STATUSES = ["Open", "In Progress", "Ready for Testing", "Resolved", "Reopened"] as const;
 export type Status = (typeof STATUSES)[number];
 
 export type Permission = "report" | "edit" | "assign" | "progress" | "verify" | "archive" | "manage";
@@ -46,6 +46,20 @@ export interface AppModule {
   keywords: string[];
 }
 
+/** Page context saved with a screenshot captured from Nuton. Never includes cookies, storage or query strings. */
+export interface CaptureMeta {
+  /** e.g. nuton.app/lesson/photosynthesis (no query or hash) */
+  path: string;
+  title: string;
+  capturedAt: string;
+  browser: string;
+  os: string;
+  screen: string;
+  viewport: string;
+  /** True when the screenshot came from the fallback renderer rather than tab capture. */
+  approximate?: boolean;
+}
+
 export interface Attachment {
   id: string;
   name: string;
@@ -54,6 +68,11 @@ export interface Attachment {
   size: number;
   /** Path of the original file in the private Supabase Storage bucket. */
   path: string;
+  /** upload: chosen file. capture: screenshot from Nuton. annotated: the capture with annotations drawn in. */
+  variant: "upload" | "capture" | "annotated";
+  /** For an annotated image, the id of the untouched original capture. */
+  sourceId?: string;
+  meta?: CaptureMeta;
   addedAt: string;
   addedById: string;
 }
@@ -65,7 +84,8 @@ export type ActivityType =
   | "comment"
   | "edit"
   | "attachment"
-  | "archive";
+  | "archive"
+  | "verified";
 
 export interface ActivityItem {
   id: string;
@@ -104,6 +124,8 @@ export interface Bug {
   fixDescription: string;
   fixedAt?: string;
   resolvedAt?: string;
+  verifiedAt?: string;
+  verifiedById?: string;
   archived: boolean;
   originalReport: string;
   activity: ActivityItem[];
@@ -135,8 +157,25 @@ export interface DraftBug extends DraftFields {
   flags: Partial<Record<keyof DraftFields, FieldFlag>>;
 }
 
+/** The evidence-first Report a Bug form (stored in the same drafts table). */
+export interface QuickForm {
+  title: string;
+  description: string;
+  severity: Severity | "";
+  moduleId: string;
+  priority: Priority | "";
+  category: Category | "";
+  environment: string;
+  steps: string[];
+  expected: string;
+  actual: string;
+}
+
 export interface Draft {
   id: string;
+  /** "form" for the evidence-first form; absent for drafts from the notes flow. */
+  kind?: "form";
+  form?: QuickForm;
   original: string;
   attachments: Attachment[];
   moduleHint: string;

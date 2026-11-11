@@ -4,9 +4,8 @@ export const STATUS_META: Record<Status, { color: string; dot: string; text: str
   Open: { color: "var(--color-st-open)", dot: "bg-st-open", text: "text-st-open", tint: "bg-st-open/10", hint: "Reported and awaiting developer action" },
   "In Progress": { color: "var(--color-st-progress)", dot: "bg-st-progress", text: "text-st-progress", tint: "bg-st-progress/10", hint: "A developer is actively working on it" },
   "Ready for Testing": { color: "var(--color-st-testing)", dot: "bg-st-testing", text: "text-st-testing", tint: "bg-st-testing/10", hint: "Fix submitted and waiting for verification" },
-  Verified: { color: "var(--color-st-verified)", dot: "bg-st-verified", text: "text-st-verified", tint: "bg-st-verified/10", hint: "The reporter has confirmed the fix" },
-  Reopened: { color: "var(--color-st-reopened)", dot: "bg-st-reopened", text: "text-st-reopened", tint: "bg-st-reopened/10", hint: "The issue persists or the fix was unsuccessful" },
-  Closed: { color: "var(--color-st-closed)", dot: "bg-st-closed", text: "text-st-closed", tint: "bg-st-closed/10", hint: "Formally closed" },
+  Resolved: { color: "var(--color-st-verified)", dot: "bg-st-verified", text: "text-st-verified", tint: "bg-st-verified/10", hint: "Fixed. Stays in the list as a record" },
+  Reopened: { color: "var(--color-st-reopened)", dot: "bg-st-reopened", text: "text-st-reopened", tint: "bg-st-reopened/10", hint: "The issue came back or the fix didn't hold" },
 };
 
 export const SEVERITY_META: Record<Severity, { dot: string; text: string; tint: string; order: number; hint: string }> = {
@@ -25,13 +24,13 @@ export const PRIORITY_HINTS: Record<Priority, string> = {
 
 export const SEVERITY_TO_PRIORITY: Record<Severity, Priority> = { Critical: "P0", High: "P1", Medium: "P2", Low: "P3" };
 
-/** Segment filters: "Open" groups Open + Reopened, "Resolved" groups Verified + Closed. */
+/** Status tabs. "Open" groups Open + Reopened so nothing that needs attention is hidden. */
 export const SEGMENTS = [
   { id: "all", label: "All", statuses: null },
   { id: "open", label: "Open", statuses: ["Open", "Reopened"] },
   { id: "progress", label: "In Progress", statuses: ["In Progress"] },
   { id: "testing", label: "Ready for Testing", statuses: ["Ready for Testing"] },
-  { id: "resolved", label: "Resolved", statuses: ["Verified", "Closed"] },
+  { id: "resolved", label: "Resolved", statuses: ["Resolved"] },
 ] as const satisfies readonly { id: string; label: string; statuses: readonly Status[] | null }[];
 
 export type SegmentId = (typeof SEGMENTS)[number]["id"];

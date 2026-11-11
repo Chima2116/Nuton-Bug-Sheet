@@ -19,6 +19,8 @@ export function activityVerb(a: ActivityItem, users: Map<string, User>): string 
       return a.text?.toLowerCase().startsWith("added") ? a.text.toLowerCase() : "attached files";
     case "archive":
       return a.text?.toLowerCase().includes("restored") ? "restored this from the archive" : "archived this bug";
+    case "verified":
+      return "verified the fix";
   }
 }
 
@@ -39,5 +41,7 @@ export function feedVerb(a: ActivityItem, bug: Bug, users: Map<string, User>): s
       return `attached files to ${bug.id}`;
     case "archive":
       return a.text?.toLowerCase().includes("restored") ? `restored ${bug.id}` : `archived ${bug.id}`;
+    case "verified":
+      return `verified ${bug.id}`;
   }
 }

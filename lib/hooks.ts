@@ -41,10 +41,9 @@ export function useBug(id: string): Bug | undefined {
   return useMemo(() => bugs.find((b) => b.id.toLowerCase() === id.toLowerCase()), [bugs, id]);
 }
 
-/** Active (non-archived) bugs. */
+/** Every bug. Resolved bugs stay in the list as a full history. */
 export function useActiveBugs() {
-  const bugs = useBugs();
-  return useMemo(() => bugs.filter((b) => !b.archived), [bugs]);
+  return useBugs();
 }
 
 /** Anyone on the team can be assigned a bug (the developer fixes, the designer follows up or tests). */

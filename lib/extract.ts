@@ -188,7 +188,7 @@ const CATEGORY_RULES: [Category, RegExp][] = [
   ["Functional", /\b(loses?|lost|disappear\w*|resets?|clears?|cleared|doesn'?t work|does not work|not working|broken|fails?|error|can'?t|cannot|nothing happens|click(?:ing)?|button|submit|save[sd]?|not (?:appear|show|load|update)|(?:doesn'?t|don'?t|does not|do not|didn'?t|did not)\s+(?:show|appear|save|load|update|work))\b/gi],
 ];
 
-function pickCategory(text: string): Category | "" {
+export function pickCategory(text: string): Category | "" {
   let best: Category | "" = "";
   let bestScore = 0;
   CATEGORY_RULES.forEach(([cat, re]) => {
@@ -201,7 +201,7 @@ function pickCategory(text: string): Category | "" {
   return best;
 }
 
-function pickModule(text: string, modules: AppModule[]): string {
+export function pickModule(text: string, modules: AppModule[]): string {
   const lower = text.toLowerCase();
   let best = "";
   let bestScore = 0;
