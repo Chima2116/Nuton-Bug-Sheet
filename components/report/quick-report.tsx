@@ -151,9 +151,9 @@ export function QuickReport() {
     return () => clearTimeout(t);
   }, [form, attachments, touched, hasContent, persist]);
 
-  const startCapture = async () => {
-    await persist(); // the draft is safe before Nuton opens
-    capture.open();
+  // The window opens immediately (pop-up blockers need that) and goes to Nuton once the draft is saved.
+  const startCapture = () => {
+    capture.open(persist);
   };
 
   /* ---- helpers ---- */
@@ -243,7 +243,7 @@ export function QuickReport() {
 
           {!shown.length && !pending.length ? (
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-              <button onClick={() => void startCapture()} disabled={busy} className="flex min-h-[132px] flex-col gap-3 rounded-xl bg-olive-600 p-[18px] text-left text-white transition-colors hover:bg-olive-700 disabled:opacity-70">
+              <button onClick={startCapture} disabled={busy} className="flex min-h-[132px] flex-col gap-3 rounded-xl bg-olive-600 p-[18px] text-left text-white transition-colors hover:bg-olive-700 disabled:opacity-70">
                 <span className="flex size-[34px] items-center justify-center rounded-[9px] bg-white/15"><Camera className="size-[18px]" /></span>
                 <span>
                   <strong className="block text-[15px] font-semibold">Capture from Nuton</strong>
@@ -261,7 +261,7 @@ export function QuickReport() {
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" onClick={() => void startCapture()} disabled={busy}><Camera className="size-4" /> Capture another</Button>
+              <Button variant="primary" onClick={startCapture} disabled={busy}><Camera className="size-4" /> Capture another</Button>
               <Button onClick={() => fileIn.current?.click()}><Upload className="size-4" /> Upload</Button>
             </div>
           )}

@@ -114,7 +114,11 @@ export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: I
       win.current.postMessage({ source: "bug-sheet", v: 1, session: session.current, type: "count", count }, NUTON_ORIGIN);
   }, [count, state]);
 
-  const open = useCallback(() => {
+  /**
+   * Must be called straight from a click. The window is opened right away (browsers such as Safari only
+   * allow a pop-up in the same instant as the click) and sent on to Nuton after `before` finishes, e.g. saving the draft.
+   */
+  const open = useCallback((before?: () => Promise<unknown>) => {
     if (win.current && !win.current.closed) {
       win.current.focus();
       return true;
@@ -122,14 +126,28 @@ export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: I
     reset();
     session.current = newSession();
     const hash = `#nuton-capture=${session.current}&origin=${encodeURIComponent(window.location.origin)}&v=1`;
-    const w = window.open(START_URL + hash, WINDOW_NAME, "popup=yes,width=1440,height=900,noopener=no");
+    const w = window.open("about:blank", WINDOW_NAME, "popup=yes,width=1440,height=900");
     if (!w) {
       session.current = "";
-      cb.current.onProblem("Your browser blocked the capture window. Allow pop-ups for this site, then try again.");
+      cb.current.onProblem("Your browser blocked the capture window. Allow pop-ups for this site (look for an icon in the address bar), then try again.");
       return false;
     }
+    try {
+      w.document.title = "Opening Nuton…";
+      w.document.body.style.cssText = "margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#6b6b64";
+      w.document.body.textContent = "Opening Nuton…";
+    } catch {}
     win.current = w;
     setState("opening");
+    const go = () => {
+      if (w.closed || win.current !== w) return;
+      try {
+        w.location.href = START_URL + hash;
+      } catch {
+        cb.current.onProblem("Couldn't open Nuton in the capture window. Close it and try again.");
+      }
+    };
+    Promise.resolve(before?.()).then(go, go);
     timers.current.ready = setTimeout(() => {
       cb.current.onProblem("Nuton didn't respond. Make sure you're signed in to Nuton and that capture is enabled there, then try again.");
       setState((s) => (s === "opening" ? "opening" : s));
