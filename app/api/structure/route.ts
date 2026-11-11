@@ -16,7 +16,7 @@ export const maxDuration = 60;
  */
 
 const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+const GEMINI_MODELS = Array.from(new Set([process.env.GEMINI_MODEL || "gemini-3.5-flash-lite", "gemini-3.6-flash"]));
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -103,24 +103,37 @@ async function callGemini(system: string, text: string, images: StructureImage[]
   });
   input.push({ type: "text", text: `<note>\n${text.trim()}\n</note>` });
 
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
-    body: JSON.stringify({
-      model: GEMINI_MODEL,
-      system_instruction: system,
-      input,
-      response_format: { type: "text", mime_type: "application/json", schema: OUTPUT_SCHEMA },
-      generation_config: { max_output_tokens: 8192 },
-    }),
-    signal: AbortSignal.timeout(50_000),
-    cache: "no-store",
-  });
-  if (!res.ok) {
+  // Try the main model first; if it is busy or unavailable, try the next one.
+  let res: Response | null = null;
+  let lastStatus = 0;
+  for (const model of GEMINI_MODELS) {
+    try {
+      res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY ?? "" },
+        body: JSON.stringify({
+          model,
+          system_instruction: system,
+          input,
+          response_format: { type: "text", mime_type: "application/json", schema: OUTPUT_SCHEMA },
+          generation_config: { max_output_tokens: 8192 },
+        }),
+        signal: AbortSignal.timeout(27_000),
+        cache: "no-store",
+      });
+    } catch {
+      res = null;
+      lastStatus = 0;
+      continue;
+    }
+    if (res.ok) break;
+    lastStatus = res.status;
     // The body can name the reason (bad key, quota). Log it for the server owner; never return it to the browser.
-    console.error("structure: gemini error", res.status, (await res.text().catch(() => "")).slice(0, 300));
-    throw new ModelFailure(res.status === 429 ? 429 : 502, res.status === 429 ? "rate_limited" : "model_error");
+    console.error("structure: gemini error", model, res.status, (await res.text().catch(() => "")).slice(0, 300));
+    res = null;
+    if (res === null && (lastStatus === 400 || lastStatus === 401 || lastStatus === 403)) break; // the key or request is wrong; another model won't help
   }
+  if (!res) throw new ModelFailure(lastStatus === 429 ? 429 : 502, lastStatus === 429 ? "rate_limited" : "model_error");
   const data = (await res.json()) as { steps?: GeminiStep[]; output_text?: string };
   const fromSteps = (data.steps ?? [])
     .filter((s) => !s.type || s.type === "model_output")
