@@ -26,7 +26,7 @@ export interface IncomingShot {
   meta: CaptureMeta;
 }
 
-export type CaptureState = "idle" | "opening" | "connected";
+export type CaptureState = "idle" | "opening" | "connected" | "blocked";
 
 const str = (v: unknown, max = 300) => (typeof v === "string" ? v.slice(0, max) : "");
 
@@ -59,6 +59,8 @@ function newSession() {
 
 export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: IncomingShot) => Promise<void> | void; onProblem: (message: string) => void; count: number }) {
   const [state, setState] = useState<CaptureState>("idle");
+  const [fallbackHref, setFallbackHref] = useState("");
+  /** The Nuton window. Known up front for a pop-up, or learned from the first valid "ready" message for a link-opened tab. */
   const win = useRef<Window | null>(null);
   const session = useRef("");
   const timers = useRef<{ ready?: ReturnType<typeof setTimeout>; poll?: ReturnType<typeof setInterval> }>({});
@@ -72,15 +74,21 @@ export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: I
     clearInterval(timers.current.poll);
     win.current = null;
     session.current = "";
+    setFallbackHref("");
     setState("idle");
   }, []);
 
   useEffect(() => {
     const send = (msg: Record<string, unknown>) => win.current?.postMessage({ source: "bug-sheet", v: 1, session: session.current, ...msg }, NUTON_ORIGIN);
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== NUTON_ORIGIN || !win.current || e.source !== win.current) return;
+      if (e.origin !== NUTON_ORIGIN || !session.current) return;
       const d = e.data as Record<string, unknown> | null;
-      if (!d || d.source !== "nuton-capture" || d.v !== 1 || d.session !== session.current || !session.current) return;
+      if (!d || d.source !== "nuton-capture" || d.v !== 1 || d.session !== session.current) return;
+      if (!win.current) {
+        // A tab opened from a link: bind to the first window that proves it knows the one-time code.
+        if (d.type !== "ready" || !e.source) return;
+        win.current = e.source as Window;
+      } else if (e.source !== win.current) return;
       if (d.type === "ready") {
         clearTimeout(timers.current.ready);
         setState("connected");
@@ -114,49 +122,65 @@ export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: I
       win.current.postMessage({ source: "bug-sheet", v: 1, session: session.current, type: "count", count }, NUTON_ORIGIN);
   }, [count, state]);
 
-  /**
-   * Must be called straight from a click. The window is opened right away (browsers such as Safari only
-   * allow a pop-up in the same instant as the click) and sent on to Nuton after `before` finishes, e.g. saving the draft.
-   */
-  const open = useCallback((before?: () => Promise<unknown>) => {
-    if (win.current && !win.current.closed) {
-      win.current.focus();
-      return true;
-    }
-    reset();
-    session.current = newSession();
-    const hash = `#nuton-capture=${session.current}&origin=${encodeURIComponent(window.location.origin)}&v=1`;
-    const w = window.open("about:blank", WINDOW_NAME, "popup=yes,width=1440,height=900");
-    if (!w) {
-      session.current = "";
-      cb.current.onProblem("Your browser blocked the capture window. Allow pop-ups for this site (look for an icon in the address bar), then try again.");
-      return false;
-    }
-    try {
-      w.document.title = "Opening Nuton…";
-      w.document.body.style.cssText = "margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#6b6b64";
-      w.document.body.textContent = "Opening Nuton…";
-    } catch {}
-    win.current = w;
+  const waitForNuton = useCallback(() => {
     setState("opening");
-    const go = () => {
-      if (w.closed || win.current !== w) return;
-      try {
-        w.location.href = START_URL + hash;
-      } catch {
-        cb.current.onProblem("Couldn't open Nuton in the capture window. Close it and try again.");
-      }
-    };
-    Promise.resolve(before?.()).then(go, go);
+    clearTimeout(timers.current.ready);
+    clearInterval(timers.current.poll);
     timers.current.ready = setTimeout(() => {
       cb.current.onProblem("Nuton didn't respond. Make sure you're signed in to Nuton and that capture is enabled there, then try again.");
-      setState((s) => (s === "opening" ? "opening" : s));
     }, READY_TIMEOUT_MS);
     timers.current.poll = setInterval(() => {
       if (win.current?.closed) reset();
     }, 700);
-    return true;
   }, [reset]);
+
+  /**
+   * Must be called straight from a click. The window is opened right away (browsers such as Safari only allow a
+   * pop-up in the same instant as the click) and sent on to Nuton after `before` finishes, e.g. saving the draft.
+   * If the browser blocks the pop-up, state becomes "blocked" and `fallbackHref` is a link that opens Nuton in a new tab.
+   */
+  const open = useCallback(
+    (before?: () => Promise<unknown>) => {
+      if (win.current && !win.current.closed) {
+        win.current.focus();
+        return true;
+      }
+      reset();
+      session.current = newSession();
+      const hash = `#nuton-capture=${session.current}&origin=${encodeURIComponent(window.location.origin)}&v=1`;
+      const url = START_URL + hash;
+      const w = window.open("about:blank", WINDOW_NAME, "popup=yes,width=1440,height=900");
+      if (!w) {
+        setFallbackHref(url);
+        setState("blocked");
+        return false;
+      }
+      try {
+        w.document.title = "Opening Nuton…";
+        w.document.body.style.cssText = "margin:0;display:grid;place-items:center;height:100vh;font:14px system-ui;color:#6b6b64";
+        w.document.body.textContent = "Opening Nuton…";
+      } catch {}
+      win.current = w;
+      waitForNuton();
+      const go = () => {
+        if (w.closed || win.current !== w) return;
+        try {
+          w.location.href = url;
+        } catch {
+          cb.current.onProblem("Couldn't open Nuton in the capture window. Close it and try again.");
+        }
+      };
+      Promise.resolve(before?.()).then(go, go);
+      return true;
+    },
+    [reset, waitForNuton],
+  );
+
+  /** Called when the fallback link is clicked: the new tab is opened by the browser, so we just start listening. */
+  const linkOpened = useCallback(() => {
+    setFallbackHref("");
+    waitForNuton();
+  }, [waitForNuton]);
 
   const focus = useCallback(() => win.current?.focus(), []);
   const cancel = useCallback(() => {
@@ -166,5 +190,5 @@ export function useNutonCapture({ onShot, onProblem, count }: { onShot: (shot: I
     reset();
   }, [reset]);
 
-  return { state, open, focus, cancel };
+  return { state, open, focus, cancel, fallbackHref, linkOpened };
 }

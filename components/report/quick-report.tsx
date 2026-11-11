@@ -215,7 +215,7 @@ export function QuickReport() {
   };
 
   const otherDrafts = drafts.filter((d) => d.id !== draftId);
-  const busy = capture.state !== "idle";
+  const busy = capture.state === "opening" || capture.state === "connected";
   const savedLabel = saved.state === "saving" ? "Saving…" : saved.state === "saved" ? `Draft saved ${timeAgo(saved.at)}` : hasContent ? "Not saved yet" : "Nothing to save yet";
 
   return (
@@ -230,7 +230,23 @@ export function QuickReport() {
             <span className="text-xs text-muted">{shown.length ? `${shown.length} attached` : "Optional, but it helps"}</span>
           </div>
 
-          {busy ? (
+          {capture.state === "blocked" ? (
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-wash px-4 py-3 text-[13px] text-ink-2" role="alert">
+              <span className="min-w-0 flex-1">Your browser blocked the pop-up window. Open Nuton in a new tab instead. You can also allow pop-ups for this site.</span>
+              <a
+                href={capture.fallbackHref}
+                target="_blank"
+                rel="opener"
+                onClick={() => { void persist(); capture.linkOpened(); }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-olive-600 px-3 text-[13px] font-medium text-white hover:bg-olive-700"
+              >
+                <Camera className="size-4" /> Open Nuton in a new tab
+              </a>
+              <Button size="sm" variant="ghost" onClick={capture.cancel}>Dismiss</Button>
+            </div>
+          ) : null}
+
+          {busy && capture.state !== "blocked" ? (
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-olive-50 px-4 py-3 text-[13px] text-olive-800" role="status">
               {capture.state === "opening" ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
               <span className="min-w-0 flex-1">
